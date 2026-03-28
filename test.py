@@ -109,8 +109,9 @@ class FinalBlazeBlock_tiny():
         self.convs = f.convs
 
     def __call__(self, x):
-        h = F.pad(x, (0, 2, 0, 2), "constant", 0)
-        return self.act(self.convs(h))
+        x = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
+        x = to_torch(x)
+        return self.act(self.convs(x))
 
 class BlazeFace_tiny():
     def __init__(self, m):
@@ -143,10 +144,10 @@ class BlazeFace_tiny():
         x = x.relu()
         x = self.backbone_tiny(x)           # (b, 16, 16, 96)
 
-        x = to_torch(x)
-
         h = self.final(x)              # (b, 8, 8, 96)
         
+        x = to_torch(x)
+
         # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
         # permute the output from the conv layers before reshaping it.
         
