@@ -64,31 +64,9 @@ class FinalBlazeBlock(nn.Module):
 
 
 class BlazeFace(nn.Module):
-    """The BlazeFace face detection model from MediaPipe.
-    
-    The version from MediaPipe is simpler than the one in the paper; 
-    it does not use the "double" BlazeBlocks.
-
-    Because we won't be training this model, it doesn't need to have
-    batchnorm layers. These have already been "folded" into the conv 
-    weights by TFLite.
-
-    The conversion to PyTorch is fairly straightforward, but there are 
-    some small differences between TFLite and PyTorch in how they handle
-    padding on conv layers with stride 2.
-
-    This version works on batches, while the MediaPipe version can only
-    handle a single image at a time.
-
-    Based on code from https://github.com/tkat0/PyTorch_BlazeFace/ and
-    https://github.com/google/mediapipe/
-    """
     def __init__(self):
         super(BlazeFace, self).__init__()
 
-        # These are the settings from the MediaPipe example graphs
-        # mediapipe/graphs/face_detection/face_detection_mobile_gpu.pbtxt
-        # and mediapipe/graphs/face_detection/face_detection_back_mobile_gpu.pbtxt
         self.num_classes = 1
         self.num_anchors = 896
         self.num_coords = 16
@@ -101,9 +79,6 @@ class BlazeFace(nn.Module):
         self.min_score_thresh = 0.65
         self.min_suppression_threshold = 0.3
 
-        self._define_layers()
-
-    def _define_layers(self):
         self.backbone = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
             nn.ReLU(inplace=True),
