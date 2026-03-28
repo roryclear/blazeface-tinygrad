@@ -40,7 +40,6 @@ class BlazeBlock(nn.Module):
 
         self.conv0_tiny = tiny_nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=in_channels, bias=True)
         self.conv1_tiny = tiny_nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
-
         self.act = nn.ReLU(inplace=True)
 
 
@@ -105,9 +104,14 @@ class FinalBlazeBlock(nn.Module):
 
         self.act = nn.ReLU(inplace=True)
 
-    def forward(self, x):
-        h = F.pad(x, (0, 2, 0, 2), "constant", 0)
 
+class FinalBlazeBlock_tiny():
+    def __init__(self, f):
+        self.act = f.act
+        self.convs = f.convs
+
+    def __call__(self, x):
+        h = F.pad(x, (0, 2, 0, 2), "constant", 0)
         return self.act(self.convs(h))
 
 class BlazeFace_tiny():
@@ -442,6 +446,7 @@ model.min_score_thresh = 0.75
 model.min_suppression_threshold = 0.3
 
 model_tiny = BlazeFace_tiny(model)
+model_tiny.final = FinalBlazeBlock_tiny(model_tiny.final)
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
