@@ -71,7 +71,7 @@ def to_tiny_seq(x):
     for i in range(len(x)): ret.list[i] = x[i]
     return ret
 
-class tiny_Seq(nn.Module):
+class tiny_Seq():
     def __init__(self, size=0):
         super().__init__()
         self.list = [None] * size
