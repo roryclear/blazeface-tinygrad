@@ -33,18 +33,24 @@ class BlazeBlock(nn.Module):
         self.act = nn.ReLU(inplace=True)
 
     def forward(self, x):
+        x = to_tiny(x)
         if self.stride == 2:
-            h = F.pad(x, (0, 2, 0, 2), "constant", 0)
-            x = tinyTensor(x.detach().numpy())
+            h = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
             x = x.max_pool2d(self.stride, self.stride)
-            x = Tensor(x.numpy())
         else:
             h = x
 
         if self.channel_pad > 0:
-            x = F.pad(x, (0, 0, 0, 0, 0, self.channel_pad), "constant", 0)
+            x = x.pad(((0, 0), (0, self.channel_pad), (0, 0), (0, 0)))
+
+        x = to_torch(x)
+        h = to_torch(h)
 
         return self.act(self.convs(h) + x)
+
+def to_tiny(x): return tinyTensor(x.detach().numpy())
+
+def to_torch(x): return Tensor(x.numpy())
 
 class FinalBlazeBlock(nn.Module):
     def __init__(self, channels, kernel_size=3):
