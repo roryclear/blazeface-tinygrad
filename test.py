@@ -54,12 +54,12 @@ class BlazeBlock(nn.Module):
             x = x.pad(((0, 0), (0, self.channel_pad), (0, 0), (0, 0)))
 
 
+        h = self.conv0_tiny(h)
+        h = self.conv1_tiny(h)
+        x += h
+        x = x.relu()
         x = to_torch(x)
-        h = to_torch(h)
-        h = self.convs[0](h)
-        h = self.convs[1](h)
-
-        return self.act(h + x)
+        return x
 
 def to_tiny(x): return tinyTensor(x.detach().numpy())
 
@@ -366,15 +366,21 @@ def save_detections_on_original(
 
 gpu = "cpu"
 
-back_net = BlazeFace().to(gpu)
+model = BlazeFace().to(gpu)
 
-back_net.load_state_dict(torch.load("blazefaceback.pth"))
-back_net.eval() 
+model.load_state_dict(torch.load("blazefaceback.pth"))
 
-back_net.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=back_net._device())
+for i in range(2, len(model.backbone)):
+    model.backbone[i].conv0_tiny.weight = to_tiny(model.backbone[i].convs[0].weight)
+    model.backbone[i].conv0_tiny.bias = to_tiny(model.backbone[i].convs[0].bias)
+    model.backbone[i].conv1_tiny.weight = to_tiny(model.backbone[i].convs[1].weight)
+    model.backbone[i].conv1_tiny.bias = to_tiny(model.backbone[i].convs[1].bias)
 
-back_net.min_score_thresh = 0.75
-back_net.min_suppression_threshold = 0.3
+
+model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=model._device())
+
+model.min_score_thresh = 0.75
+model.min_suppression_threshold = 0.3
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
@@ -400,7 +406,7 @@ img = cv2.copyMakeBorder(
 
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-detections = back_net.predict_on_image(img).numpy()
+detections = model.predict_on_image(img).numpy()
 
 expected = [[0.22293027,0.3687327,0.35492355,0.500726,0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 [0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
