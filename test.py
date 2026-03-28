@@ -4,8 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import cv2
 from torch import Tensor
-from tinygrad import Tensor as tinyTensor
+from tinygrad import Tensor as tinyTensor, nn as tiny_nn
 
+#class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
+
+#def __init__(self, in_channels:int, out_channels:int, kernel_size:int|tuple[int, ...], stride=1, padding:int|tuple[int, ...]|str=0, dilation=1, groups=1, bias=True):
 
 class BlazeBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
@@ -13,6 +16,10 @@ class BlazeBlock(nn.Module):
 
         self.stride = stride
         self.channel_pad = out_channels - in_channels
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.stride = stride
 
         # TFLite uses slightly different padding than PyTorch 
         # on the depthwise conv layer when the stride is 2.
@@ -30,6 +37,9 @@ class BlazeBlock(nn.Module):
                       kernel_size=1, stride=1, padding=0, bias=True),
         )
 
+        self.conv0_tiny = tiny_nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=in_channels, bias=True)
+        self.conv1_tiny = tiny_nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+
         self.act = nn.ReLU(inplace=True)
 
     def forward(self, x):
@@ -43,10 +53,13 @@ class BlazeBlock(nn.Module):
         if self.channel_pad > 0:
             x = x.pad(((0, 0), (0, self.channel_pad), (0, 0), (0, 0)))
 
+
         x = to_torch(x)
         h = to_torch(h)
+        h = self.convs[0](h)
+        h = self.convs[1](h)
 
-        return self.act(self.convs(h) + x)
+        return self.act(h + x)
 
 def to_tiny(x): return tinyTensor(x.detach().numpy())
 
@@ -92,7 +105,6 @@ class BlazeFace(nn.Module):
         self.backbone = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
             nn.ReLU(inplace=True),
-
             BlazeBlock(24, 24),
             BlazeBlock(24, 24),
             BlazeBlock(24, 24),
@@ -125,6 +137,7 @@ class BlazeFace(nn.Module):
             BlazeBlock(96, 96),
             BlazeBlock(96, 96),
         )
+
         self.final = FinalBlazeBlock(96)
         self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
         self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
@@ -169,12 +182,7 @@ class BlazeFace(nn.Module):
     def _device(self):
         """Which device (CPU or GPU) is being used by this model?"""
         return self.classifier_8.weight.device
-    
-    def load_weights(self, path):
-        self.load_state_dict(torch.load(path))
-        self.eval()        
-    
-    def load_anchors(self, path): self.anchors = torch.tensor(np.load(path), dtype=torch.float32, device=self._device())
+       
 
     def _preprocess(self, x): return x.float() / 127.5 - 1.0
 
@@ -359,8 +367,11 @@ def save_detections_on_original(
 gpu = "cpu"
 
 back_net = BlazeFace().to(gpu)
-back_net.load_weights("blazefaceback.pth")
-back_net.load_anchors("anchorsback.npy")
+
+back_net.load_state_dict(torch.load("blazefaceback.pth"))
+back_net.eval() 
+
+back_net.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=back_net._device())
 
 back_net.min_score_thresh = 0.75
 back_net.min_suppression_threshold = 0.3
