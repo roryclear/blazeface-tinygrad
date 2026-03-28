@@ -83,7 +83,7 @@ class BlazeFace(nn.Module):
     Based on code from https://github.com/tkat0/PyTorch_BlazeFace/ and
     https://github.com/google/mediapipe/
     """
-    def __init__(self, back_model=False):
+    def __init__(self):
         super(BlazeFace, self).__init__()
 
         # These are the settings from the MediaPipe example graphs
@@ -93,97 +93,59 @@ class BlazeFace(nn.Module):
         self.num_anchors = 896
         self.num_coords = 16
         self.score_clipping_thresh = 100.0
-        self.back_model = back_model
-        if back_model:
-            self.x_scale = 256.0
-            self.y_scale = 256.0
-            self.h_scale = 256.0
-            self.w_scale = 256.0
-            self.min_score_thresh = 0.65
-        else:
-            self.x_scale = 128.0
-            self.y_scale = 128.0
-            self.h_scale = 128.0
-            self.w_scale = 128.0
-            self.min_score_thresh = 0.75
+
+        self.x_scale = 256.0
+        self.y_scale = 256.0
+        self.h_scale = 256.0
+        self.w_scale = 256.0
+        self.min_score_thresh = 0.65
         self.min_suppression_threshold = 0.3
 
         self._define_layers()
 
     def _define_layers(self):
-        if self.back_model:
-            self.backbone = nn.Sequential(
-                nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
-                nn.ReLU(inplace=True),
+        self.backbone = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
+            nn.ReLU(inplace=True),
 
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24, stride=2),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 48, stride=2),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 48),
-                BlazeBlock(48, 96, stride=2),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-            )
-            self.final = FinalBlazeBlock(96)
-            self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
-            self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24, stride=2),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 48, stride=2),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 96, stride=2),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+        )
+        self.final = FinalBlazeBlock(96)
+        self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
+        self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
 
-            self.regressor_8 = nn.Conv2d(96, 32, 1, bias=True)
-            self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
-        else:
-            self.backbone1 = nn.Sequential(
-                nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
-                nn.ReLU(inplace=True),
-
-                BlazeBlock(24, 24),
-                BlazeBlock(24, 28),
-                BlazeBlock(28, 32, stride=2),
-                BlazeBlock(32, 36),
-                BlazeBlock(36, 42),
-                BlazeBlock(42, 48, stride=2),
-                BlazeBlock(48, 56),
-                BlazeBlock(56, 64),
-                BlazeBlock(64, 72),
-                BlazeBlock(72, 80),
-                BlazeBlock(80, 88),
-            )
-
-            self.backbone2 = nn.Sequential(
-                BlazeBlock(88, 96, stride=2),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-                BlazeBlock(96, 96),
-            )
-            self.classifier_8 = nn.Conv2d(88, 2, 1, bias=True)
-            self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
-
-            self.regressor_8 = nn.Conv2d(88, 32, 1, bias=True)
-            self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
+        self.regressor_8 = nn.Conv2d(96, 32, 1, bias=True)
+        self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
 
     def forward(self, x):
         # TFLite uses slightly different padding on the first conv layer
@@ -192,12 +154,8 @@ class BlazeFace(nn.Module):
         
         b = x.shape[0]      # batch size, needed for reshaping later
 
-        if self.back_model:
-            x = self.backbone(x)           # (b, 16, 16, 96)
-            h = self.final(x)              # (b, 8, 8, 96)
-        else:
-            x = self.backbone1(x)           # (b, 88, 16, 16)
-            h = self.backbone2(x)           # (b, 96, 8, 8)
+        x = self.backbone(x)           # (b, 16, 16, 96)
+        h = self.final(x)              # (b, 8, 8, 96)
         
         # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
         # permute the output from the conv layers before reshaping it.
@@ -231,61 +189,17 @@ class BlazeFace(nn.Module):
         self.load_state_dict(torch.load(path))
         self.eval()        
     
-    def load_anchors(self, path):
-        self.anchors = torch.tensor(np.load(path), dtype=torch.float32, device=self._device())
-        assert(self.anchors.ndimension() == 2)
-        assert(self.anchors.shape[0] == self.num_anchors)
-        assert(self.anchors.shape[1] == 4)
+    def load_anchors(self, path): self.anchors = torch.tensor(np.load(path), dtype=torch.float32, device=self._device())
 
-    def _preprocess(self, x):
-        """Converts the image pixels to the range [-1, 1]."""
-        return x.float() / 127.5 - 1.0
+    def _preprocess(self, x): return x.float() / 127.5 - 1.0
 
     def predict_on_image(self, img):
-        """Makes a prediction on a single image.
-
-        Arguments:
-            img: a NumPy array of shape (H, W, 3) or a PyTorch tensor of
-                 shape (3, H, W). The image's height and width should be 
-                 128 pixels.
-
-        Returns:
-            A tensor with face detections.
-        """
         if isinstance(img, np.ndarray):
             img = torch.from_numpy(img).permute((2, 0, 1))
 
         return self.predict_on_batch(img.unsqueeze(0))[0]
 
     def predict_on_batch(self, x):
-        """Makes a prediction on a batch of images.
-
-        Arguments:
-            x: a NumPy array of shape (b, H, W, 3) or a PyTorch tensor of
-               shape (b, 3, H, W). The height and width should be 128 pixels.
-
-        Returns:
-            A list containing a tensor of face detections for each image in 
-            the batch. If no faces are found for an image, returns a tensor
-            of shape (0, 17).
-
-        Each face detection is a PyTorch tensor consisting of 17 numbers:
-            - ymin, xmin, ymax, xmax
-            - x,y-coordinates for the 6 keypoints
-            - confidence score
-        """
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x).permute((0, 3, 1, 2))
-
-        assert x.shape[1] == 3
-        if self.back_model:
-            assert x.shape[2] == 256
-            assert x.shape[3] == 256
-        else:
-            assert x.shape[2] == 128
-            assert x.shape[3] == 128
-
-        # 1. Preprocess the images into tensors:
         x = x.to(self._device())
         x = self._preprocess(x)
 
@@ -306,41 +220,17 @@ class BlazeFace(nn.Module):
         return filtered_detections
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
-        """The output of the neural network is a tensor of shape (b, 896, 16)
-        containing the bounding box regressor predictions, as well as a tensor 
-        of shape (b, 896, 1) with the classification confidences.
-
-        This function converts these two "raw" tensors into proper detections.
-        Returns a list of (num_detections, 17) tensors, one for each image in
-        the batch.
-
-        This is based on the source code from:
-        mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
-        mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
-        """
-        assert raw_box_tensor.ndimension() == 3
-        assert raw_box_tensor.shape[1] == self.num_anchors
-        assert raw_box_tensor.shape[2] == self.num_coords
-
-        assert raw_score_tensor.ndimension() == 3
-        assert raw_score_tensor.shape[1] == self.num_anchors
-        assert raw_score_tensor.shape[2] == self.num_classes
-
-        assert raw_box_tensor.shape[0] == raw_score_tensor.shape[0]
-        
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)
         
         thresh = self.score_clipping_thresh
         raw_score_tensor = raw_score_tensor.clamp(-thresh, thresh)
         detection_scores = raw_score_tensor.sigmoid().squeeze(dim=-1)
-        
-        # Note: we stripped off the last dimension from the scores tensor
-        # because there is only has one class. Now we can simply use a mask
-        # to filter out the boxes with too low confidence.
+
         mask = detection_scores >= self.min_score_thresh
 
         # Because each image from the batch can have a different number of
         # detections, process them one at a time using a loop.
+        # todo, static!
         output_detections = []
         for i in range(raw_box_tensor.shape[0]):
             boxes = detection_boxes[i, mask[i]]
@@ -350,9 +240,6 @@ class BlazeFace(nn.Module):
         return output_detections
 
     def _decode_boxes(self, raw_boxes, anchors):
-        """Converts the predictions into actual coordinates using
-        the anchor boxes. Processes the entire batch at once.
-        """
         boxes = torch.zeros_like(raw_boxes)
 
         x_center = raw_boxes[..., 0] / self.x_scale * anchors[:, 2] + anchors[:, 0]
@@ -366,7 +253,7 @@ class BlazeFace(nn.Module):
         boxes[..., 2] = y_center + h / 2.  # ymax
         boxes[..., 3] = x_center + w / 2.  # xmax
 
-        for k in range(6):
+        for k in range(6): # todo, vectorize?
             offset = 4 + k*2
             keypoint_x = raw_boxes[..., offset    ] / self.x_scale * anchors[:, 2] + anchors[:, 0]
             keypoint_y = raw_boxes[..., offset + 1] / self.y_scale * anchors[:, 3] + anchors[:, 1]
@@ -375,25 +262,7 @@ class BlazeFace(nn.Module):
 
         return boxes
 
-    def _weighted_non_max_suppression(self, detections):
-        """The alternative NMS method as mentioned in the BlazeFace paper:
-
-        "We replace the suppression algorithm with a blending strategy that
-        estimates the regression parameters of a bounding box as a weighted
-        mean between the overlapping predictions."
-
-        The original MediaPipe code assigns the score of the most confident
-        detection to the weighted detection, but we take the average score
-        of the overlapping detections.
-
-        The input detections should be a Tensor of shape (count, 17).
-
-        Returns a list of PyTorch tensors, one for each detected face.
-        
-        This is based on the source code from:
-        mediapipe/calculators/util/non_max_suppression_calculator.cc
-        mediapipe/calculators/util/non_max_suppression_calculator.proto
-        """
+    def _weighted_non_max_suppression(self, detections): # todo, vectorize nms
         if len(detections) == 0: return []
 
         output_detections = []
@@ -436,16 +305,6 @@ class BlazeFace(nn.Module):
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
 def intersect(box_a, box_b):
-    """ We resize both tensors to [A,B,2] without new malloc:
-    [A,2] -> [A,1,2] -> [A,B,2]
-    [B,2] -> [1,B,2] -> [A,B,2]
-    Then we compute the area of intersect between box_a and box_b.
-    Args:
-      box_a: (tensor) bounding boxes, Shape: [A,4].
-      box_b: (tensor) bounding boxes, Shape: [B,4].
-    Return:
-      (tensor) intersection area, Shape: [A,B].
-    """
     A = box_a.size(0)
     B = box_b.size(0)
     max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
@@ -457,17 +316,6 @@ def intersect(box_a, box_b):
 
 
 def jaccard(box_a, box_b):
-    """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
-    is simply the intersection over union of two boxes.  Here we operate on
-    ground truth boxes and default boxes.
-    E.g.:
-        A ∩ B / A ∪ B = A ∩ B / (area(A) + area(B) - A ∩ B)
-    Args:
-        box_a: (tensor) Ground truth bounding boxes, Shape: [num_objects,4]
-        box_b: (tensor) Prior boxes from priorbox layers, Shape: [num_priors,4]
-    Return:
-        jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
-    """
     inter = intersect(box_a, box_b)
     area_a = ((box_a[:, 2]-box_a[:, 0]) *
               (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
@@ -477,9 +325,7 @@ def jaccard(box_a, box_b):
     return inter / union  # [A,B]
 
 
-def overlap_similarity(box, other_boxes):
-    """Computes the IOU between a bounding box and set of other boxes."""
-    return jaccard(box.unsqueeze(0), other_boxes).squeeze(0)
+def overlap_similarity(box, other_boxes): return jaccard(box.unsqueeze(0), other_boxes).squeeze(0)
 
 def save_detections_on_original(
     original_img,
@@ -527,7 +373,7 @@ def save_detections_on_original(
 
 gpu = "cpu"
 
-back_net = BlazeFace(back_model=True).to(gpu)
+back_net = BlazeFace().to(gpu)
 back_net.load_weights("blazefaceback.pth")
 back_net.load_anchors("anchorsback.npy")
 
