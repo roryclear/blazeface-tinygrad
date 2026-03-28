@@ -101,6 +101,8 @@ class BlazeFace(nn.Module):
         self.w_scale = 256.0
         self.min_score_thresh = 0.65
         self.min_suppression_threshold = 0.3
+        
+        self.conv_tiny = tiny_nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True)
 
         self.backbone = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
@@ -151,6 +153,10 @@ class BlazeFace(nn.Module):
         x = F.pad(x, (1, 2, 1, 2), "constant", 0)
         
         b = x.shape[0]      # batch size, needed for reshaping later
+
+        x = to_tiny(x)
+        x = self.conv_tiny(x)
+        x = to_torch(x)
 
         x = self.backbone(x)           # (b, 16, 16, 96)
         h = self.final(x)              # (b, 8, 8, 96)
@@ -292,8 +298,7 @@ class BlazeFace(nn.Module):
 
             output_detections.append(weighted_detection)
 
-        return output_detections    
-
+        return output_detections
 
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
@@ -376,6 +381,10 @@ for i in range(2, len(model.backbone)):
     model.backbone[i].conv1_tiny.weight = to_tiny(model.backbone[i].convs[1].weight)
     model.backbone[i].conv1_tiny.bias = to_tiny(model.backbone[i].convs[1].bias)
 
+model.conv_tiny.weight = to_tiny(model.backbone[0].weight)
+model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
+
+del model.backbone[0]
 
 model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=model._device())
 
