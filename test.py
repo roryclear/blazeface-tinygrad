@@ -6,6 +6,7 @@ import cv2
 from torch import Tensor
 from tinygrad import Tensor as tinyTensor, nn as tiny_nn
 
+
 #class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
 
 #def __init__(self, in_channels:int, out_channels:int, kernel_size:int|tuple[int, ...], stride=1, padding:int|tuple[int, ...]|str=0, dilation=1, groups=1, bias=True):
@@ -64,6 +65,20 @@ class BlazeBlock(nn.Module):
 def to_tiny(x): return tinyTensor(x.detach().numpy())
 
 def to_torch(x): return Tensor(x.numpy())
+
+def to_tiny_seq(x):
+    ret = tiny_Seq(size=len(x))
+    for i in range(len(x)): ret.list[i] = x[i]
+    return ret
+
+class tiny_Seq(nn.Module):
+    def __init__(self, size=0):
+        super().__init__()
+        self.list = [None] * size
+
+    def __call__(self, x):
+        for y in self.list: x = y(x)
+        return x
 
 class FinalBlazeBlock(nn.Module):
     def __init__(self, channels, kernel_size=3):
@@ -159,7 +174,8 @@ class BlazeFace(nn.Module):
         x = x.relu()
         x = to_torch(x)
 
-        x = self.backbone(x)           # (b, 16, 16, 96)
+        x = self.backbone_tiny(x)           # (b, 16, 16, 96)
+
         h = self.final(x)              # (b, 8, 8, 96)
         
         # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
@@ -387,6 +403,8 @@ model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
 
 del model.backbone[0]
 del model.backbone[0]
+
+model.backbone_tiny = to_tiny_seq(model.backbone)
 
 model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=model._device())
 
