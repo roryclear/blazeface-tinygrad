@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
+from torch import Tensor
+from tinygrad import Tensor as tinyTensor
 
 
 class BlazeBlock(nn.Module):
@@ -33,7 +35,9 @@ class BlazeBlock(nn.Module):
     def forward(self, x):
         if self.stride == 2:
             h = F.pad(x, (0, 2, 0, 2), "constant", 0)
-            x = self.max_pool(x)
+            x = tinyTensor(x.detach().numpy())
+            x = x.max_pool2d(self.stride, self.stride)
+            x = Tensor(x.numpy())
         else:
             h = x
 
