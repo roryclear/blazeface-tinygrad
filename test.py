@@ -51,7 +51,6 @@ class BlazeBlock_tiny():
         self.conv1_tiny = b.conv1_tiny
     
     def __call__(self, x):
-        x = to_tiny(x)
         if self.stride == 2:
             h = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
             x = x.max_pool2d(self.stride, self.stride)
@@ -66,7 +65,6 @@ class BlazeBlock_tiny():
         h = self.conv1_tiny(h)
         x += h
         x = x.relu()
-        x = to_torch(x)
         return x
 
 def to_tiny(x): return tinyTensor(x.detach().numpy())
@@ -143,9 +141,9 @@ class BlazeFace_tiny():
         x = to_tiny(x)
         x = self.conv_tiny(x)
         x = x.relu()
-        x = to_torch(x)
-
         x = self.backbone_tiny(x)           # (b, 16, 16, 96)
+
+        x = to_torch(x)
 
         h = self.final(x)              # (b, 8, 8, 96)
         
