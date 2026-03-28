@@ -156,6 +156,7 @@ class BlazeFace(nn.Module):
 
         x = to_tiny(x)
         x = self.conv_tiny(x)
+        x = x.relu()
         x = to_torch(x)
 
         x = self.backbone(x)           # (b, 16, 16, 96)
@@ -384,6 +385,7 @@ for i in range(2, len(model.backbone)):
 model.conv_tiny.weight = to_tiny(model.backbone[0].weight)
 model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
 
+del model.backbone[0]
 del model.backbone[0]
 
 model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=model._device())
