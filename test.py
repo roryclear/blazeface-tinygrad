@@ -43,7 +43,15 @@ class BlazeBlock(nn.Module):
 
         self.act = nn.ReLU(inplace=True)
 
-    def forward(self, x):
+
+class BlazeBlock_tiny():
+    def __init__(self, b):
+        self.stride = b.stride
+        self.channel_pad = b.channel_pad
+        self.conv0_tiny = b.conv0_tiny
+        self.conv1_tiny = b.conv1_tiny
+    
+    def __call__(self, x):
         x = to_tiny(x)
         if self.stride == 2:
             h = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
@@ -75,7 +83,9 @@ class tiny_Seq():
     def __init__(self, size=0):
         super().__init__()
         self.list = [None] * size
-
+    def __len__(self): return len(self.list)
+    def __setitem__(self, key, value): self.list[key] = value
+    def __getitem__(self, idx): return self.list[idx]
     def __call__(self, x):
         for y in self.list: x = y(x)
         return x
@@ -423,6 +433,8 @@ del model.backbone[0]
 del model.backbone[0]
 
 model.backbone_tiny = to_tiny_seq(model.backbone)
+
+for i in range(len(model.backbone_tiny)): model.backbone_tiny[i] = BlazeBlock_tiny(model.backbone_tiny[i])
 
 model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32)
 
