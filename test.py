@@ -100,69 +100,26 @@ class FinalBlazeBlock(nn.Module):
 
         return self.act(self.convs(h))
 
+class BlazeFace_tiny():
+    def __init__(self, m):
 
-class BlazeFace(nn.Module):
-    def __init__(self):
-        super(BlazeFace, self).__init__()
+        self.backbone_tiny = m.backbone_tiny
+        self.conv_tiny = m.conv_tiny
+        self.classifier_8 = m.classifier_8
+        self.classifier_16 = m.classifier_16
+        self.regressor_8 = m.regressor_8
+        self.regressor_16 = m.regressor_16
+        self.anchors = m.anchors
+        self.x_scale = m.x_scale
+        self.y_scale = m.y_scale
+        self.w_scale = m.w_scale
+        self.h_scale = m.h_scale
+        self.score_clipping_thresh = m.score_clipping_thresh
+        self.min_score_thresh = m.min_score_thresh
+        self.min_suppression_threshold = m.min_suppression_threshold
+        self.final = m.final
 
-        self.num_classes = 1
-        self.num_anchors = 896
-        self.num_coords = 16
-        self.score_clipping_thresh = 100.0
-
-        self.x_scale = 256.0
-        self.y_scale = 256.0
-        self.h_scale = 256.0
-        self.w_scale = 256.0
-        self.min_score_thresh = 0.65
-        self.min_suppression_threshold = 0.3
-        
-        self.conv_tiny = tiny_nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True)
-
-        self.backbone = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
-            nn.ReLU(inplace=True),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24, stride=2),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 48, stride=2),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 96, stride=2),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-        )
-
-        self.final = FinalBlazeBlock(96)
-        self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
-        self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
-
-        self.regressor_8 = nn.Conv2d(96, 32, 1, bias=True)
-        self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
-
-    def forward(self, x):
+    def __call__(self, x):
         # TFLite uses slightly different padding on the first conv layer
         # than PyTorch, so do it manually.
         x = F.pad(x, (1, 2, 1, 2), "constant", 0)
@@ -317,6 +274,67 @@ class BlazeFace(nn.Module):
 
         return output_detections
 
+class BlazeFace(nn.Module):
+    def __init__(self):
+        super(BlazeFace, self).__init__()
+
+        self.num_classes = 1
+        self.num_anchors = 896
+        self.num_coords = 16
+        self.score_clipping_thresh = 100.0
+
+        self.x_scale = 256.0
+        self.y_scale = 256.0
+        self.h_scale = 256.0
+        self.w_scale = 256.0
+        self.min_score_thresh = 0.65
+        self.min_suppression_threshold = 0.3
+        
+        self.conv_tiny = tiny_nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True)
+
+        self.backbone = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
+            nn.ReLU(inplace=True),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24, stride=2),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 24),
+            BlazeBlock(24, 48, stride=2),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 48),
+            BlazeBlock(48, 96, stride=2),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+            BlazeBlock(96, 96),
+        )
+
+        self.final = FinalBlazeBlock(96)
+        self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
+        self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
+
+        self.regressor_8 = nn.Conv2d(96, 32, 1, bias=True)
+        self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
+
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
 def intersect(box_a, box_b):
@@ -406,10 +424,12 @@ del model.backbone[0]
 
 model.backbone_tiny = to_tiny_seq(model.backbone)
 
-model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32, device=model._device())
+model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32)
 
 model.min_score_thresh = 0.75
 model.min_suppression_threshold = 0.3
+
+model_tiny = BlazeFace_tiny(model)
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
@@ -435,7 +455,7 @@ img = cv2.copyMakeBorder(
 
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-detections = model.predict_on_image(img).numpy()
+detections = model_tiny.predict_on_image(img).numpy()
 
 expected = [[0.22293027,0.3687327,0.35492355,0.500726,0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 [0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
