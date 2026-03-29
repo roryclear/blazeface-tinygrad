@@ -76,7 +76,7 @@ class FinalBlazeBlock_tiny():
         return x
 
 class BlazeFace_tiny():
-    def __init__(self, m=None, anchors=None):
+    def __init__(self, m=None):
         if m is not None:
             self.backbone_tiny = m.backbone_tiny
             self.conv_tiny = m.conv_tiny
@@ -136,7 +136,7 @@ class BlazeFace_tiny():
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(96, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
 
-        self.anchors = anchors
+        self.anchors = tinyTensor.empty(896, 4)
         self.num_classes = 1
         self.num_anchors = 896
         self.num_coords = 16
@@ -325,16 +325,15 @@ def save_detections_on_original(
 
 
 state_dict = safe_load("model.safetensors")
-anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32)
 
-model_tiny2 = BlazeFace_tiny(anchors=anchors)
+model_tiny2 = BlazeFace_tiny()
 load_state_dict(model_tiny2, state_dict)
+
 
 model_tiny2.min_score_thresh = 0.75
 
-state_dict2 = get_state_dict(model_tiny2)
 
-load_state_dict(model_tiny2, state_dict)
+
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
 
@@ -362,13 +361,6 @@ img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 detections = model_tiny2.predict_on_image(img).numpy()
 
 detections = detections[:, :4]
-
-s = "["
-for y in detections:
-    s += "["
-    for x in y: s += str(x) + ","
-    s += "],"
-print(s+"]")
 
 expected = [[0.22250968,0.36720884,0.35707378,0.501773,],[0.3098331,0.68761027,0.43034846,0.80812573,],]
 
