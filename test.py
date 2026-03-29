@@ -201,12 +201,7 @@ class BlazeFace_tiny():
 
         detections = tinyTensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
-        tiny_boxes = postprocess(detections)[0].numpy()
-        faces = [torch.tensor(row) for row in tiny_boxes]
-
-        faces = torch.stack(faces)
-        faces = faces[faces[:, 4] != 0]
-        return faces
+        return postprocess(detections)[0]
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
@@ -358,7 +353,7 @@ img = cv2.copyMakeBorder(
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 detections = model_tiny2.predict_on_image(img).numpy()
-
+detections = detections[detections[:, 4] != 0]
 detections = detections[:, :4]
 
 expected = [[0.22250968,0.36720884,0.35707378,0.501773,],[0.3098331,0.68761027,0.43034846,0.80812573,],]
