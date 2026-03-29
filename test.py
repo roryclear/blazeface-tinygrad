@@ -199,9 +199,8 @@ class BlazeFace_tiny():
 
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
-        detections = torch.cat([detections[:, :4], detections[:, 16:17]], dim=1)
+        detections = tinyTensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
-        detections = to_tiny(detections)
         tiny_boxes = postprocess(detections)[0].numpy()
         faces = [torch.tensor(row) for row in tiny_boxes]
 
@@ -218,7 +217,7 @@ class BlazeFace_tiny():
         scores = scores.unsqueeze(-1)  # (B, N, 1)
         detections = tinyTensor.cat(detection_boxes, scores, dim=-1)  # (B, N, 17)
         detections *= mask.unsqueeze(-1)
-        return to_torch(detections[0])
+        return detections[0]
     
     def _decode_boxes(self, raw_boxes, anchors):
         raw_boxes = to_tiny(raw_boxes)
