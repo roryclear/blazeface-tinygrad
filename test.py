@@ -109,11 +109,16 @@ class FinalBlazeBlock(nn.Module):
 
 
 class FinalBlazeBlock_tiny():
-    def __init__(self, f):
-        self.act = f.act
-        self.convs = f.convs
-        self.conv0_tiny = f.conv0_tiny
-        self.conv1_tiny = f.conv1_tiny
+    def __init__(self, f=None):
+        if f is not None:
+            self.act = f.act
+            self.convs = f.convs
+            self.conv0_tiny = f.conv0_tiny
+            self.conv1_tiny = f.conv1_tiny
+            return
+        
+        self.conv0_tiny = tiny_nn.Conv2d(96, 96, kernel_size=3, stride=2, padding=0, groups=96, bias=True)
+        self.conv1_tiny = tiny_nn.Conv2d(96, 96, kernel_size=1, stride=1, padding=0, bias=True)
 
     def __call__(self, x):
         x = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
@@ -147,6 +152,8 @@ class BlazeFace_tiny():
         self.classifier_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=6, kernel_size=1, groups=1, bias=True)
         self.regressor_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=32, kernel_size=1, groups=1, bias=True)
         self.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
+
+        self.final = FinalBlazeBlock_tiny()
     
 
     def __call__(self, x):
