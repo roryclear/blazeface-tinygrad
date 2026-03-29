@@ -204,24 +204,17 @@ class BlazeFace_tiny():
         return faces
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
-        detection_boxes = self._decode_boxes(raw_box_tensor, anchors)
-        
+        detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
         thresh = self.score_clipping_thresh
-        raw_score_tensor = raw_score_tensor.clamp(-thresh, thresh)
-        detection_scores = raw_score_tensor.sigmoid().squeeze(dim=-1)
-        mask = detection_scores >= self.min_score_thresh
-
-        # Because each image from the batch can have a different number of
-        # detections, process them one at a time using a loop.
-        # todo, static!
-        output_detections = []
-        for i in range(raw_box_tensor.shape[0]):
-            boxes = detection_boxes[i, mask[i]]
-            scores = detection_scores[i, mask[i]].unsqueeze(dim=-1)
-            output_detections.append(torch.cat((boxes, scores), dim=-1))
-
-        return output_detections
-
+        scores = raw_score_tensor.clamp(-thresh, thresh).sigmoid().squeeze(-1)  # (B, N)
+        mask = scores >= self.min_score_thresh  # (B, N)
+        scores = scores.unsqueeze(-1)  # (B, N, 1)
+        detections = torch.cat((detection_boxes, scores), dim=-1)  # (B, N, 17)
+        valid_idx = mask.nonzero(as_tuple=False)  # (K, 2) -> [batch_idx, anchor_idx]
+        detections = detections[valid_idx[:, 0], valid_idx[:, 1]]  # (K, 17)
+        batch_ids = valid_idx[:, 0]  # (K,)
+        return detections, batch_ids
+    
     def _decode_boxes(self, raw_boxes, anchors):
         boxes = torch.zeros_like(raw_boxes)
         x_center = raw_boxes[..., 0] / self.x_scale * anchors[:, 2] + anchors[:, 0]
