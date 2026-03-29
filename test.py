@@ -216,7 +216,9 @@ class BlazeFace_tiny():
         return detections, batch_ids
     
     def _decode_boxes(self, raw_boxes, anchors):
-        boxes = torch.zeros_like(raw_boxes)
+        raw_boxes = to_tiny(raw_boxes)
+        anchors = to_tiny(anchors)
+        boxes = tinyTensor.zeros_like(raw_boxes).contiguous()
         ax = anchors[:, 0]
         ay = anchors[:, 1]
         aw = anchors[:, 2]
@@ -232,9 +234,9 @@ class BlazeFace_tiny():
         keypoints = raw_boxes[..., 4:].view(*raw_boxes.shape[:-1], 6, 2)
         kp_x = keypoints[..., 0] / self.x_scale * aw.unsqueeze(0).unsqueeze(-1) + ax.unsqueeze(0).unsqueeze(-1)
         kp_y = keypoints[..., 1] / self.y_scale * ah.unsqueeze(0).unsqueeze(-1) + ay.unsqueeze(0).unsqueeze(-1)
-        keypoints_decoded = torch.stack((kp_x, kp_y), dim=-1)  # (B, N, 6, 2)
+        keypoints_decoded = tinyTensor.stack((kp_x, kp_y), dim=-1)  # (B, N, 6, 2)
         boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
-        return boxes
+        return to_torch(boxes)
 
     def _weighted_non_max_suppression(self, detections): # todo, vectorize nms
         if len(detections) == 0: return []
