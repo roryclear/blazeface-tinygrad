@@ -201,27 +201,22 @@ class BlazeFace_tiny():
 
         detections = torch.cat([detections[:, :4], detections[:, 16:17]], dim=1)
 
+        detections = detections[detections[:, 4] != 0]
+
         faces = self._weighted_non_max_suppression(detections)
         faces = torch.stack(faces)
         return faces
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
-        print(raw_box_tensor.shape, raw_score_tensor.shape)
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
         thresh = self.score_clipping_thresh
         raw_score_tensor = to_tiny(raw_score_tensor)
         scores = raw_score_tensor.clip(-thresh, thresh).sigmoid().squeeze(-1)
         mask = scores >= self.min_score_thresh  # (B, N)
-        print(mask.shape)
         scores = scores.unsqueeze(-1)  # (B, N, 1)
         detections = tinyTensor.cat(detection_boxes, scores, dim=-1)  # (B, N, 17)
         detections *= mask.unsqueeze(-1)
-        mask = to_torch(mask)
-        print(detections.shape)
-        detections = to_torch(detections)
-        valid_idx = mask.nonzero(as_tuple=False)  # (K, 2) -> [batch_idx, anchor_idx]
-        detections = detections[valid_idx[:, 0], valid_idx[:, 1]]  # (K, 17)
-        return detections
+        return to_torch(detections[0])
     
     def _decode_boxes(self, raw_boxes, anchors):
         raw_boxes = to_tiny(raw_boxes)
@@ -388,4 +383,5 @@ save_detections_on_original(
     resized_shape=(256, 256),
     output_path="result.jpg"
 )
+
 
