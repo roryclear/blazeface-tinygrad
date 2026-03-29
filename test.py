@@ -186,20 +186,17 @@ class BlazeFace_tiny():
         return [r, c]
 
 
-    def predict_on_image(self, img):
-        img = torch.from_numpy(img).permute((2, 0, 1))
-        return self.predict_on_batch(img.unsqueeze(0))
 
-    def predict_on_batch(self, x):
-        x = to_tiny(x)
+    def predict_on_image(self, x):
+        x = tinyTensor(x)
+        x = x.permute((2, 0, 1))
+        x = x.unsqueeze(0)
         x = x / 127.5 - 1.0
         out = self.__call__(x)
 
         out[0] = to_torch(out[0])
         out[1] = to_torch(out[1])
 
-
-        # 3. Postprocess the raw predictions:
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
         faces = self._weighted_non_max_suppression(detections[0])
