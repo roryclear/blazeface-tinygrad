@@ -245,9 +245,6 @@ class BlazeFace_tiny():
         if len(detections) == 0: return []
 
         tiny_boxes = postprocess(to_tiny(detections))[0].numpy()
-        print(tiny_boxes.shape)
-        print(tiny_boxes)
-
         tiny_boxes = tiny_boxes[tiny_boxes[:, 4] != 0]
         tiny_boxes = [torch.tensor(row) for row in tiny_boxes]
         return tiny_boxes
@@ -370,14 +367,12 @@ detections = model_tiny2.predict_on_image(img).numpy()
 
 detections = detections[:, :4]
 
-expected = [[0.22293027,0.3687327,0.35492355,0.500726],
-[0.30805102,0.68929595,0.42866126,0.8099063],]
+expected = [[0.22257513,0.36959693,0.35338074,0.5004025,],[0.30618382,0.6910623,0.4268934,0.8117719,], ]
 
 #expected = [[0.22293027,0.3687327,0.35492355,0.500726, 0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 #[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
 
-
-np.testing.assert_allclose(detections, expected, rtol=1e-2, atol=1e-2)
+np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
 
 save_detections_on_original(
     original_img=cv2.cvtColor(orig, cv2.COLOR_RGB2BGR),
