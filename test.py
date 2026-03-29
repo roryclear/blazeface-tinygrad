@@ -30,6 +30,8 @@ class BlazeBlock(nn.Module):
             padding = 0
         else:
             padding = (kernel_size - 1) // 2
+        
+        print(kernel_size,stride,padding)
 
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, 
@@ -45,11 +47,15 @@ class BlazeBlock(nn.Module):
 
 
 class BlazeBlock_tiny():
-    def __init__(self, b):
-        self.stride = b.stride
-        self.channel_pad = b.channel_pad
-        self.conv0_tiny = b.conv0_tiny
-        self.conv1_tiny = b.conv1_tiny
+    def __init__(self, c=None, channel_pad=0):
+        if c is not None:
+            self.stride = c.stride
+            self.channel_pad = c.channel_pad
+            self.conv0_tiny = c.conv0_tiny
+            self.conv1_tiny = c.conv1_tiny
+            return
+        
+        self.channel_pad = channel_pad
     
     def __call__(self, x):
         if self.stride == 2:
@@ -128,7 +134,7 @@ class FinalBlazeBlock_tiny():
         return x
 
 class BlazeFace_tiny():
-    def __init__(self, m=None):
+    def __init__(self, m=None, anchors=None):
         if m is not None:
             self.backbone_tiny = m.backbone_tiny
             self.conv_tiny = m.conv_tiny
@@ -154,7 +160,53 @@ class BlazeFace_tiny():
         self.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
 
         self.final = FinalBlazeBlock_tiny()
-    
+        self.backbone_tiny = tiny_Seq(31)
+        for i in range(7):
+            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, groups=24, bias=True)
+            self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+            self.backbone_tiny[i].stride = 1
+        self.backbone_tiny[7] = BlazeBlock_tiny()
+        self.backbone_tiny[7].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=2, padding=0, groups=24, bias=True)
+        self.backbone_tiny[7].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+        self.backbone_tiny[7].stride = 2
+        for i in range(8, 15):
+            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, groups=24, bias=True)
+            self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+            self.backbone_tiny[i].stride = 1
+        self.backbone_tiny[15] = BlazeBlock_tiny(channel_pad=24)
+        self.backbone_tiny[15].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=2, padding=0, groups=24, bias=True)
+        self.backbone_tiny[15].conv1_tiny = tiny_nn.Conv2d(24, 48, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+        self.backbone_tiny[15].stride = 2
+        for i in range(16, 23):
+            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(48, 48, kernel_size=3, stride=1, padding=1, groups=48, bias=True)
+            self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(48, 48, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+            self.backbone_tiny[i].stride = 1
+        self.backbone_tiny[23] = BlazeBlock_tiny(channel_pad=48)
+        self.backbone_tiny[23].conv0_tiny = tiny_nn.Conv2d(48, 48, kernel_size=3, stride=2, padding=0, groups=48, bias=True)
+        self.backbone_tiny[23].conv1_tiny = tiny_nn.Conv2d(48, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+        self.backbone_tiny[23].stride = 2
+        for i in range(24, 31):
+            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, groups=96, bias=True)
+            self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(96, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
+            self.backbone_tiny[i].stride = 1
+
+        self.anchors = anchors
+        self.num_classes = 1
+        self.num_anchors = 896
+        self.num_coords = 16
+        self.score_clipping_thresh = 100.0
+
+        self.x_scale = 256.0
+        self.y_scale = 256.0
+        self.h_scale = 256.0
+        self.w_scale = 256.0
+        self.min_score_thresh = 0.65
+        self.min_suppression_threshold = 0.3
+
 
     def __call__(self, x):
         # TFLite uses slightly different padding on the first conv layer
@@ -238,7 +290,6 @@ class BlazeFace_tiny():
 
     def _decode_boxes(self, raw_boxes, anchors):
         boxes = torch.zeros_like(raw_boxes)
-
         x_center = raw_boxes[..., 0] / self.x_scale * anchors[:, 2] + anchors[:, 0]
         y_center = raw_boxes[..., 1] / self.y_scale * anchors[:, 3] + anchors[:, 1]
 
@@ -488,9 +539,11 @@ model_tiny.regressor_16_tiny.bias = to_tiny(model.regressor_16.bias)
 
 state_dict = get_state_dict(model_tiny)
 
-model_tiny2 = BlazeFace_tiny()
+model_tiny2 = BlazeFace_tiny(anchors=model.anchors)
 load_state_dict(model_tiny2, state_dict)
 state_dict2 = get_state_dict(model_tiny2)
+
+load_state_dict(model_tiny2, state_dict)
 
 for k in state_dict.keys():
     print(k, type(state_dict[k]), k in state_dict2)
