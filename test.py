@@ -30,8 +30,6 @@ class BlazeBlock(nn.Module):
             padding = 0
         else:
             padding = (kernel_size - 1) // 2
-        
-        print(kernel_size,stride,padding)
 
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, 
@@ -256,6 +254,7 @@ class BlazeFace_tiny():
         out[0] = to_torch(out[0])
         out[1] = to_torch(out[1])
 
+
         # 3. Postprocess the raw predictions:
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
@@ -274,7 +273,6 @@ class BlazeFace_tiny():
         thresh = self.score_clipping_thresh
         raw_score_tensor = raw_score_tensor.clamp(-thresh, thresh)
         detection_scores = raw_score_tensor.sigmoid().squeeze(dim=-1)
-
         mask = detection_scores >= self.min_score_thresh
 
         # Because each image from the batch can have a different number of
@@ -541,12 +539,14 @@ state_dict = get_state_dict(model_tiny)
 
 model_tiny2 = BlazeFace_tiny(anchors=model.anchors)
 load_state_dict(model_tiny2, state_dict)
+
+model_tiny2.min_score_thresh = 0.75
+
 state_dict2 = get_state_dict(model_tiny2)
 
 load_state_dict(model_tiny2, state_dict)
 
-for k in state_dict.keys():
-    print(k, type(state_dict[k]), k in state_dict2)
+safe_save(state_dict, "model.safetensors")
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
@@ -572,10 +572,11 @@ img = cv2.copyMakeBorder(
 
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-detections = model_tiny.predict_on_image(img).numpy()
+detections = model_tiny2.predict_on_image(img).numpy()
 
 expected = [[0.22293027,0.3687327,0.35492355,0.500726,0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 [0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
+
 
 np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
 
