@@ -217,24 +217,23 @@ class BlazeFace_tiny():
     
     def _decode_boxes(self, raw_boxes, anchors):
         boxes = torch.zeros_like(raw_boxes)
-        x_center = raw_boxes[..., 0] / self.x_scale * anchors[:, 2] + anchors[:, 0]
-        y_center = raw_boxes[..., 1] / self.y_scale * anchors[:, 3] + anchors[:, 1]
-
-        w = raw_boxes[..., 2] / self.w_scale * anchors[:, 2]
-        h = raw_boxes[..., 3] / self.h_scale * anchors[:, 3]
-
+        ax = anchors[:, 0]
+        ay = anchors[:, 1]
+        aw = anchors[:, 2]
+        ah = anchors[:, 3]
+        x_center = raw_boxes[..., 0] / self.x_scale * aw + ax
+        y_center = raw_boxes[..., 1] / self.y_scale * ah + ay
+        w = raw_boxes[..., 2] / self.w_scale * aw
+        h = raw_boxes[..., 3] / self.h_scale * ah
         boxes[..., 0] = y_center - h / 2.  # ymin
         boxes[..., 1] = x_center - w / 2.  # xmin
         boxes[..., 2] = y_center + h / 2.  # ymax
         boxes[..., 3] = x_center + w / 2.  # xmax
-
-        for k in range(6): # todo, vectorize?
-            offset = 4 + k*2
-            keypoint_x = raw_boxes[..., offset    ] / self.x_scale * anchors[:, 2] + anchors[:, 0]
-            keypoint_y = raw_boxes[..., offset + 1] / self.y_scale * anchors[:, 3] + anchors[:, 1]
-            boxes[..., offset    ] = keypoint_x
-            boxes[..., offset + 1] = keypoint_y
-
+        keypoints = raw_boxes[..., 4:].view(*raw_boxes.shape[:-1], 6, 2)
+        kp_x = keypoints[..., 0] / self.x_scale * aw.unsqueeze(0).unsqueeze(-1) + ax.unsqueeze(0).unsqueeze(-1)
+        kp_y = keypoints[..., 1] / self.y_scale * ah.unsqueeze(0).unsqueeze(-1) + ay.unsqueeze(0).unsqueeze(-1)
+        keypoints_decoded = torch.stack((kp_x, kp_y), dim=-1)  # (B, N, 6, 2)
+        boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
         return boxes
 
     def _weighted_non_max_suppression(self, detections): # todo, vectorize nms
