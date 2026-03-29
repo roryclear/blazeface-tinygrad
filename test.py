@@ -100,6 +100,10 @@ class FinalBlazeBlock(nn.Module):
                       kernel_size=1, stride=1, padding=0, bias=True),
         )
 
+
+        self.conv0_tiny = tiny_nn.Conv2d(channels, channels, kernel_size=kernel_size, stride=2, padding=0, groups=channels, bias=True)
+        self.conv1_tiny = tiny_nn.Conv2d(channels, channels, kernel_size=1, stride=1, padding=0, bias=True)
+
         self.act = nn.ReLU(inplace=True)
 
 
@@ -107,11 +111,16 @@ class FinalBlazeBlock_tiny():
     def __init__(self, f):
         self.act = f.act
         self.convs = f.convs
+        self.conv0_tiny = f.conv0_tiny
+        self.conv1_tiny = f.conv1_tiny
 
     def __call__(self, x):
         x = x.pad(((0, 0), (0, 0), (0, 2), (0, 2)))
+        x = self.conv0_tiny(x)
+        x = self.conv1_tiny(x)
+        x = x.relu()
         x = to_torch(x)
-        return self.act(self.convs(x))
+        return x
 
 class BlazeFace_tiny():
     def __init__(self, m):
@@ -428,6 +437,12 @@ for i in range(2, len(model.backbone)):
     model.backbone[i].conv0_tiny.bias = to_tiny(model.backbone[i].convs[0].bias)
     model.backbone[i].conv1_tiny.weight = to_tiny(model.backbone[i].convs[1].weight)
     model.backbone[i].conv1_tiny.bias = to_tiny(model.backbone[i].convs[1].bias)
+
+
+model.final.conv0_tiny.weight = to_tiny(model.final.convs[0].weight)
+model.final.conv0_tiny.bias = to_tiny(model.final.convs[0].bias)
+model.final.conv1_tiny.weight = to_tiny(model.final.convs[1].weight)
+model.final.conv1_tiny.bias = to_tiny(model.final.convs[1].bias)
 
 model.conv_tiny.weight = to_tiny(model.backbone[0].weight)
 model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
