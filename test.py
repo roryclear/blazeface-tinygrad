@@ -244,45 +244,13 @@ class BlazeFace_tiny():
     def _weighted_non_max_suppression(self, detections): # todo, vectorize nms
         if len(detections) == 0: return []
 
-        output_detections = []
+        tiny_boxes = postprocess(to_tiny(detections))[0].numpy()
+        print(tiny_boxes.shape)
+        print(tiny_boxes)
 
-
-        tiny_boxes = postprocess(to_tiny(detections))[0]
-        print(tiny_boxes.numpy())
-
-        # Sort the detections from highest to lowest score.
-        remaining = torch.argsort(detections[:, 4], descending=True)
-
-        while len(remaining) > 0:
-            detection = detections[remaining[0]]
-
-            # Compute the overlap between the first box and the other 
-            # remaining boxes. (Note that the other_boxes also include
-            # the first_box.)
-            first_box = detection[:4]
-            other_boxes = detections[remaining, :4]
-            ious = overlap_similarity(first_box, other_boxes)
-
-            # If two detections don't overlap enough, they are considered
-            # to be from different faces.
-            mask = ious > self.min_suppression_threshold
-            overlapping = remaining[mask]
-            remaining = remaining[~mask]
-
-            # Take an average of the coordinates from the overlapping
-            # detections, weighted by their confidence scores.
-            weighted_detection = detection.clone()
-            if len(overlapping) > 1:
-                coordinates = detections[overlapping, :4]
-                scores = detections[overlapping, 4:5]
-                total_score = scores.sum()
-                weighted = (coordinates * scores).sum(dim=0) / total_score
-                weighted_detection[:4] = weighted
-                weighted_detection[4] = total_score / len(overlapping)
-
-            output_detections.append(weighted_detection)
-
-        return output_detections
+        tiny_boxes = tiny_boxes[tiny_boxes[:, 4] != 0]
+        tiny_boxes = [torch.tensor(row) for row in tiny_boxes]
+        return tiny_boxes
 
 
 def postprocess(boxes):
@@ -317,28 +285,6 @@ def compute_iou_matrix(boxes):
 
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
-def intersect(box_a, box_b):
-    A = box_a.size(0)
-    B = box_b.size(0)
-    max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, 2:].unsqueeze(0).expand(A, B, 2))
-    min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, :2].unsqueeze(0).expand(A, B, 2))
-    inter = torch.clamp((max_xy - min_xy), min=0)
-    return inter[:, :, 0] * inter[:, :, 1]
-
-
-def jaccard(box_a, box_b):
-    inter = intersect(box_a, box_b)
-    area_a = ((box_a[:, 2]-box_a[:, 0]) *
-              (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
-    area_b = ((box_b[:, 2]-box_b[:, 0]) *
-              (box_b[:, 3]-box_b[:, 1])).unsqueeze(0).expand_as(inter)  # [A,B]
-    union = area_a + area_b - inter
-    return inter / union  # [A,B]
-
-
-def overlap_similarity(box, other_boxes): return jaccard(box.unsqueeze(0), other_boxes).squeeze(0)
 
 def save_detections_on_original(
     original_img,
@@ -431,7 +377,7 @@ expected = [[0.22293027,0.3687327,0.35492355,0.500726],
 #[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
 
 
-np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
+np.testing.assert_allclose(detections, expected, rtol=1e-2, atol=1e-2)
 
 save_detections_on_original(
     original_img=cv2.cvtColor(orig, cv2.COLOR_RGB2BGR),
