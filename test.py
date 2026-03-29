@@ -143,65 +143,50 @@ class BlazeFace_tiny():
     def __call__(self, x):
         # TFLite uses slightly different padding on the first conv layer
         # than PyTorch, so do it manually.
-        x = F.pad(x, (1, 2, 1, 2), "constant", 0)
+        x = x.pad(((0, 0), (0, 0), (1, 2), (1, 2)))
         
         b = x.shape[0]      # batch size, needed for reshaping later
-
-        x = to_tiny(x)
         x = self.conv_tiny(x)
         x = x.relu()
         x = self.backbone_tiny(x)           # (b, 16, 16, 96)
 
         h = self.final(x)              # (b, 8, 8, 96)
-        
-        h = to_torch(h)
 
         # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
         # permute the output from the conv layers before reshaping it.
         
         c1 = self.classifier_8_tiny(x)       # (b, 2, 16, 16)
-        c1 = to_torch(c1)
         c1 = c1.permute(0, 2, 3, 1)     # (b, 16, 16, 2)
         c1 = c1.reshape(b, -1, 1)       # (b, 512, 1)
 
-        c2 = self.classifier_16(h)      # (b, 6, 8, 8)
+        c2 = self.classifier_16_tiny(h)      # (b, 6, 8, 8)
         c2 = c2.permute(0, 2, 3, 1)     # (b, 8, 8, 6)
         c2 = c2.reshape(b, -1, 1)       # (b, 384, 1)
 
-        c = torch.cat((c1, c2), dim=1)  # (b, 896, 1)
-
-        x = to_torch(x)
-        r1 = self.regressor_8(x)        # (b, 32, 16, 16)
+        c = tinyTensor.cat(c1, c2, dim=1)
+        r1 = self.regressor_8_tiny(x)        # (b, 32, 16, 16)
         r1 = r1.permute(0, 2, 3, 1)     # (b, 16, 16, 32)
         r1 = r1.reshape(b, -1, 16)      # (b, 512, 16)
-
-        r2 = self.regressor_16(h)       # (b, 96, 8, 8)
+        
+        r2 = self.regressor_16_tiny(h)       # (b, 96, 8, 8)
         r2 = r2.permute(0, 2, 3, 1)     # (b, 8, 8, 96)
         r2 = r2.reshape(b, -1, 16)      # (b, 384, 16)
 
-        r = torch.cat((r1, r2), dim=1)  # (b, 896, 16)
+        r = tinyTensor.cat(r1, r2, dim=1)
         return [r, c]
 
-    def _device(self):
-        """Which device (CPU or GPU) is being used by this model?"""
-        return self.classifier_8.weight.device
-       
-
-    def _preprocess(self, x): return x.float() / 127.5 - 1.0
 
     def predict_on_image(self, img):
-        if isinstance(img, np.ndarray):
-            img = torch.from_numpy(img).permute((2, 0, 1))
-
+        img = torch.from_numpy(img).permute((2, 0, 1))
         return self.predict_on_batch(img.unsqueeze(0))[0]
 
     def predict_on_batch(self, x):
-        x = x.to(self._device())
-        x = self._preprocess(x)
+        x = to_tiny(x)
+        x = x / 127.5 - 1.0
+        out = self.__call__(x)
 
-        # 2. Run the neural network:
-        with torch.no_grad():
-            out = self.__call__(x)
+        out[0] = to_torch(out[0])
+        out[1] = to_torch(out[1])
 
         # 3. Postprocess the raw predictions:
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
@@ -472,6 +457,18 @@ model_tiny.final = FinalBlazeBlock_tiny(model_tiny.final)
 model_tiny.classifier_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=2, kernel_size=1, groups=1, bias=True)
 model_tiny.classifier_8_tiny.weight = to_tiny(model.classifier_8.weight)
 model_tiny.classifier_8_tiny.bias = to_tiny(model.classifier_8.bias)
+
+model_tiny.classifier_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=6, kernel_size=1, groups=1, bias=True)
+model_tiny.classifier_16_tiny.weight = to_tiny(model.classifier_16.weight)
+model_tiny.classifier_16_tiny.bias = to_tiny(model.classifier_16.bias)
+
+model_tiny.regressor_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=32, kernel_size=1, groups=1, bias=True)
+model_tiny.regressor_8_tiny.weight = to_tiny(model.regressor_8.weight)
+model_tiny.regressor_8_tiny.bias = to_tiny(model.regressor_8.bias)
+
+model_tiny.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
+model_tiny.regressor_16_tiny.weight = to_tiny(model.regressor_16.weight)
+model_tiny.regressor_16_tiny.bias = to_tiny(model.regressor_16.bias)
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
