@@ -203,7 +203,10 @@ class BlazeFace_tiny():
         
         detections = detections[detections[:, 4] != 0]
 
-        faces = self._weighted_non_max_suppression(detections)
+        detections = to_tiny(detections)
+        tiny_boxes = postprocess(detections)[0].numpy()
+        faces = [torch.tensor(row) for row in tiny_boxes]
+
         faces = torch.stack(faces)
         faces = faces[faces[:, 4] != 0]
         return faces
@@ -242,12 +245,6 @@ class BlazeFace_tiny():
         boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
         return boxes
 
-    def _weighted_non_max_suppression(self, detections): # todo, vectorize nms
-        if len(detections) == 0: return []
-
-        tiny_boxes = postprocess(to_tiny(detections))[0].numpy()
-        tiny_boxes = [torch.tensor(row) for row in tiny_boxes]
-        return tiny_boxes
 
 
 def postprocess(boxes):
