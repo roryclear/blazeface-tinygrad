@@ -8,42 +8,6 @@ from tinygrad import Tensor as tinyTensor, nn as tiny_nn
 from tinygrad.nn.state import safe_save, safe_load, get_state_dict, load_state_dict
 
 
-#class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
-
-#def __init__(self, in_channels:int, out_channels:int, kernel_size:int|tuple[int, ...], stride=1, padding:int|tuple[int, ...]|str=0, dilation=1, groups=1, bias=True):
-
-class BlazeBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
-        super(BlazeBlock, self).__init__()
-
-        self.stride = stride
-        self.channel_pad = out_channels - in_channels
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.stride = stride
-
-        # TFLite uses slightly different padding than PyTorch 
-        # on the depthwise conv layer when the stride is 2.
-        if stride == 2:
-            self.max_pool = nn.MaxPool2d(kernel_size=stride, stride=stride)
-            padding = 0
-        else:
-            padding = (kernel_size - 1) // 2
-
-        self.convs = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=in_channels, 
-                      kernel_size=kernel_size, stride=stride, padding=padding, 
-                      groups=in_channels, bias=True),
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, 
-                      kernel_size=1, stride=1, padding=0, bias=True),
-        )
-
-        self.conv0_tiny = tiny_nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=in_channels, bias=True)
-        self.conv1_tiny = tiny_nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
-        self.act = nn.ReLU(inplace=True)
-
-
 class BlazeBlock_tiny():
     def __init__(self, c=None, channel_pad=0):
         if c is not None:
@@ -91,26 +55,6 @@ class tiny_Seq():
     def __call__(self, x):
         for y in self.list: x = y(x)
         return x
-
-class FinalBlazeBlock(nn.Module):
-    def __init__(self, channels, kernel_size=3):
-        super(FinalBlazeBlock, self).__init__()
-                                                      # TFLite uses slightly different padding than PyTorch
-        # on the depthwise conv layer when the stride is 2.
-        self.convs = nn.Sequential(
-            nn.Conv2d(in_channels=channels, out_channels=channels,
-                      kernel_size=kernel_size, stride=2, padding=0,
-                      groups=channels, bias=True),
-            nn.Conv2d(in_channels=channels, out_channels=channels,
-                      kernel_size=1, stride=1, padding=0, bias=True),
-        )
-
-
-        self.conv0_tiny = tiny_nn.Conv2d(channels, channels, kernel_size=kernel_size, stride=2, padding=0, groups=channels, bias=True)
-        self.conv1_tiny = tiny_nn.Conv2d(channels, channels, kernel_size=1, stride=1, padding=0, bias=True)
-
-        self.act = nn.ReLU(inplace=True)
-
 
 class FinalBlazeBlock_tiny():
     def __init__(self, f=None):
@@ -347,66 +291,6 @@ class BlazeFace_tiny():
 
         return output_detections
 
-class BlazeFace(nn.Module):
-    def __init__(self):
-        super(BlazeFace, self).__init__()
-
-        self.num_classes = 1
-        self.num_anchors = 896
-        self.num_coords = 16
-        self.score_clipping_thresh = 100.0
-
-        self.x_scale = 256.0
-        self.y_scale = 256.0
-        self.h_scale = 256.0
-        self.w_scale = 256.0
-        self.min_score_thresh = 0.65
-        self.min_suppression_threshold = 0.3
-        
-        self.conv_tiny = tiny_nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True)
-
-        self.backbone = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True),
-            nn.ReLU(inplace=True),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24, stride=2),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 24),
-            BlazeBlock(24, 48, stride=2),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 48),
-            BlazeBlock(48, 96, stride=2),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-            BlazeBlock(96, 96),
-        )
-
-        self.final = FinalBlazeBlock(96)
-        self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
-        self.classifier_16 = nn.Conv2d(96, 6, 1, bias=True)
-
-        self.regressor_8 = nn.Conv2d(96, 32, 1, bias=True)
-        self.regressor_16 = nn.Conv2d(96, 96, 1, bias=True)
 
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
@@ -477,67 +361,11 @@ def save_detections_on_original(
 
     cv2.imwrite(output_path, img_out)
 
-gpu = "cpu"
 
-model = BlazeFace().to(gpu)
+state_dict = safe_load("model.safetensors")
+anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32)
 
-model.load_state_dict(torch.load("blazefaceback.pth"))
-
-for i in range(2, len(model.backbone)):
-    model.backbone[i].conv0_tiny.weight = to_tiny(model.backbone[i].convs[0].weight)
-    model.backbone[i].conv0_tiny.bias = to_tiny(model.backbone[i].convs[0].bias)
-    model.backbone[i].conv1_tiny.weight = to_tiny(model.backbone[i].convs[1].weight)
-    model.backbone[i].conv1_tiny.bias = to_tiny(model.backbone[i].convs[1].bias)
-
-
-model.final.conv0_tiny.weight = to_tiny(model.final.convs[0].weight)
-model.final.conv0_tiny.bias = to_tiny(model.final.convs[0].bias)
-model.final.conv1_tiny.weight = to_tiny(model.final.convs[1].weight)
-model.final.conv1_tiny.bias = to_tiny(model.final.convs[1].bias)
-
-model.conv_tiny.weight = to_tiny(model.backbone[0].weight)
-model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
-
-#   def conv2d(self, weight:Tensor, bias:Tensor|None=None, groups=1, stride=1, dilation=1, padding:int|tuple[int, ...]=0, dtype:DTypeLike|None=None) -> Tensor:
-#class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
-
-
-#self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
-
-del model.backbone[0]
-del model.backbone[0]
-
-model.backbone_tiny = to_tiny_seq(model.backbone)
-
-for i in range(len(model.backbone_tiny)): model.backbone_tiny[i] = BlazeBlock_tiny(model.backbone_tiny[i])
-
-model.anchors = torch.tensor(np.load("anchorsback.npy"), dtype=torch.float32)
-
-model.min_score_thresh = 0.75
-model.min_suppression_threshold = 0.3
-
-model_tiny = BlazeFace_tiny(model)
-model_tiny.final = FinalBlazeBlock_tiny(model_tiny.final)
-
-model_tiny.classifier_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=2, kernel_size=1, groups=1, bias=True)
-model_tiny.classifier_8_tiny.weight = to_tiny(model.classifier_8.weight)
-model_tiny.classifier_8_tiny.bias = to_tiny(model.classifier_8.bias)
-
-model_tiny.classifier_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=6, kernel_size=1, groups=1, bias=True)
-model_tiny.classifier_16_tiny.weight = to_tiny(model.classifier_16.weight)
-model_tiny.classifier_16_tiny.bias = to_tiny(model.classifier_16.bias)
-
-model_tiny.regressor_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=32, kernel_size=1, groups=1, bias=True)
-model_tiny.regressor_8_tiny.weight = to_tiny(model.regressor_8.weight)
-model_tiny.regressor_8_tiny.bias = to_tiny(model.regressor_8.bias)
-
-model_tiny.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
-model_tiny.regressor_16_tiny.weight = to_tiny(model.regressor_16.weight)
-model_tiny.regressor_16_tiny.bias = to_tiny(model.regressor_16.bias)
-
-state_dict = get_state_dict(model_tiny)
-
-model_tiny2 = BlazeFace_tiny(anchors=model.anchors)
+model_tiny2 = BlazeFace_tiny(anchors=anchors)
 load_state_dict(model_tiny2, state_dict)
 
 model_tiny2.min_score_thresh = 0.75
@@ -545,9 +373,6 @@ model_tiny2.min_score_thresh = 0.75
 state_dict2 = get_state_dict(model_tiny2)
 
 load_state_dict(model_tiny2, state_dict)
-
-safe_save(state_dict, "model.safetensors")
-
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
 
