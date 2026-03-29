@@ -119,7 +119,6 @@ class FinalBlazeBlock_tiny():
         x = self.conv0_tiny(x)
         x = self.conv1_tiny(x)
         x = x.relu()
-        x = to_torch(x)
         return x
 
 class BlazeFace_tiny():
@@ -155,12 +154,13 @@ class BlazeFace_tiny():
 
         h = self.final(x)              # (b, 8, 8, 96)
         
-        x = to_torch(x)
+        h = to_torch(h)
 
         # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
         # permute the output from the conv layers before reshaping it.
         
-        c1 = self.classifier_8(x)       # (b, 2, 16, 16)
+        c1 = self.classifier_8_tiny(x)       # (b, 2, 16, 16)
+        c1 = to_torch(c1)
         c1 = c1.permute(0, 2, 3, 1)     # (b, 16, 16, 2)
         c1 = c1.reshape(b, -1, 1)       # (b, 512, 1)
 
@@ -170,6 +170,7 @@ class BlazeFace_tiny():
 
         c = torch.cat((c1, c2), dim=1)  # (b, 896, 1)
 
+        x = to_torch(x)
         r1 = self.regressor_8(x)        # (b, 32, 16, 16)
         r1 = r1.permute(0, 2, 3, 1)     # (b, 16, 16, 32)
         r1 = r1.reshape(b, -1, 16)      # (b, 512, 16)
@@ -447,6 +448,12 @@ model.final.conv1_tiny.bias = to_tiny(model.final.convs[1].bias)
 model.conv_tiny.weight = to_tiny(model.backbone[0].weight)
 model.conv_tiny.bias = to_tiny(model.backbone[0].bias)
 
+#   def conv2d(self, weight:Tensor, bias:Tensor|None=None, groups=1, stride=1, dilation=1, padding:int|tuple[int, ...]=0, dtype:DTypeLike|None=None) -> Tensor:
+#class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
+
+
+#self.classifier_8 = nn.Conv2d(96, 2, 1, bias=True)
+
 del model.backbone[0]
 del model.backbone[0]
 
@@ -461,6 +468,10 @@ model.min_suppression_threshold = 0.3
 
 model_tiny = BlazeFace_tiny(model)
 model_tiny.final = FinalBlazeBlock_tiny(model_tiny.final)
+
+model_tiny.classifier_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=2, kernel_size=1, groups=1, bias=True)
+model_tiny.classifier_8_tiny.weight = to_tiny(model.classifier_8.weight)
+model_tiny.classifier_8_tiny.bias = to_tiny(model.classifier_8.bias)
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
