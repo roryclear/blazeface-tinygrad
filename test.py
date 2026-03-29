@@ -3,8 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
-from torch import Tensor
-from tinygrad import Tensor as tinyTensor, nn as tiny_nn
+from tinygrad import Tensor, nn as tiny_nn
 from tinygrad.nn.state import safe_save, safe_load, get_state_dict, load_state_dict
 
 
@@ -127,7 +126,7 @@ class BlazeFace():
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(96, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
 
-        self.anchors = tinyTensor.empty(896, 4)
+        self.anchors = Tensor.empty(896, 4)
         self.num_classes = 1
         self.num_anchors = 896
         self.num_coords = 16
@@ -164,7 +163,7 @@ class BlazeFace():
         c2 = c2.permute(0, 2, 3, 1)     # (b, 8, 8, 6)
         c2 = c2.reshape(b, -1, 1)       # (b, 384, 1)
 
-        c = tinyTensor.cat(c1, c2, dim=1)
+        c = Tensor.cat(c1, c2, dim=1)
         r1 = self.regressor_8_tiny(x)        # (b, 32, 16, 16)
         r1 = r1.permute(0, 2, 3, 1)     # (b, 16, 16, 32)
         r1 = r1.reshape(b, -1, 16)      # (b, 512, 16)
@@ -173,13 +172,13 @@ class BlazeFace():
         r2 = r2.permute(0, 2, 3, 1)     # (b, 8, 8, 96)
         r2 = r2.reshape(b, -1, 16)      # (b, 384, 16)
 
-        r = tinyTensor.cat(r1, r2, dim=1)
+        r = Tensor.cat(r1, r2, dim=1)
         return [r, c]
 
 
 
     def predict_on_image(self, x):
-        x = tinyTensor(x)
+        x = Tensor(x)
         x = x.permute((2, 0, 1))
         x = x.unsqueeze(0)
         x = x / 127.5 - 1.0
@@ -187,7 +186,7 @@ class BlazeFace():
 
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
-        detections = tinyTensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
+        detections = Tensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
         return postprocess(detections)[0]
 
@@ -197,12 +196,12 @@ class BlazeFace():
         scores = raw_score_tensor.clip(-thresh, thresh).sigmoid().squeeze(-1)
         mask = scores >= self.min_score_thresh  # (B, N)
         scores = scores.unsqueeze(-1)  # (B, N, 1)
-        detections = tinyTensor.cat(detection_boxes, scores, dim=-1)  # (B, N, 17)
+        detections = Tensor.cat(detection_boxes, scores, dim=-1)  # (B, N, 17)
         detections *= mask.unsqueeze(-1)
         return detections[0]
     
     def _decode_boxes(self, raw_boxes, anchors):
-        boxes = tinyTensor.zeros_like(raw_boxes).contiguous()
+        boxes = Tensor.zeros_like(raw_boxes).contiguous()
         ax = anchors[:, 0]
         ay = anchors[:, 1]
         aw = anchors[:, 2]
@@ -218,7 +217,7 @@ class BlazeFace():
         keypoints = raw_boxes[..., 4:].view(*raw_boxes.shape[:-1], 6, 2)
         kp_x = keypoints[..., 0] / self.x_scale * aw.unsqueeze(0).unsqueeze(-1) + ax.unsqueeze(0).unsqueeze(-1)
         kp_y = keypoints[..., 1] / self.y_scale * ah.unsqueeze(0).unsqueeze(-1) + ay.unsqueeze(0).unsqueeze(-1)
-        keypoints_decoded = tinyTensor.stack((kp_x, kp_y), dim=-1)  # (B, N, 6, 2)
+        keypoints_decoded = Tensor.stack((kp_x, kp_y), dim=-1)  # (B, N, 6, 2)
         boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
         return boxes
 
@@ -228,11 +227,11 @@ def postprocess(boxes):
     iou_threshold = 0.3
     conf_threshold = 0.75 
     probs = boxes[:, :, 4] 
-    order_all = tinyTensor.topk(probs, min(max_det, probs.shape[1]))[1]
-    batch_idx = tinyTensor.arange(order_all.shape[0]).reshape(-1, 1)
+    order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
+    batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
     boxes = boxes[batch_idx, order_all]
     ious = compute_iou_matrix(boxes[:, :, :4])
-    ious = tinyTensor.triu(ious, diagonal=1)
+    ious = Tensor.triu(ious, diagonal=1)
     high_iou_mask = (ious > iou_threshold)
     no_overlap_mask = high_iou_mask.sum(axis=1) == 0
     conf_mask = (boxes[:, :, 4] >= conf_threshold)
@@ -245,12 +244,12 @@ def compute_iou_matrix(boxes):
   x2s = boxes[:, :, 2]
   y2s = boxes[:, :, 3]
   areas = (x2s - x1s) * (y2s - y1s)
-  x1 = tinyTensor.maximum(x1s[:, :, None], x1s[:, None, :])
-  y1 = tinyTensor.maximum(y1s[:, :, None], y1s[:, None, :])
-  x2 = tinyTensor.minimum(x2s[:, :, None], x2s[:, None, :])
-  y2 = tinyTensor.minimum(y2s[:, :, None], y2s[:, None, :])
-  w = tinyTensor.maximum(tinyTensor(0), x2 - x1)
-  h = tinyTensor.maximum(tinyTensor(0), y2 - y1)
+  x1 = Tensor.maximum(x1s[:, :, None], x1s[:, None, :])
+  y1 = Tensor.maximum(y1s[:, :, None], y1s[:, None, :])
+  x2 = Tensor.minimum(x2s[:, :, None], x2s[:, None, :])
+  y2 = Tensor.minimum(y2s[:, :, None], y2s[:, None, :])
+  w = Tensor.maximum(Tensor(0), x2 - x1)
+  h = Tensor.maximum(Tensor(0), y2 - y1)
   intersection = w * h
   union = areas[:, :, None] + areas[:, None, :] - intersection
   return intersection / union
