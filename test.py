@@ -8,7 +8,7 @@ from tinygrad import Tensor as tinyTensor, nn as tiny_nn
 from tinygrad.nn.state import safe_save, safe_load, get_state_dict, load_state_dict
 
 
-class BlazeBlock_tiny():
+class BlazeBlock():
     def __init__(self, c=None, channel_pad=0):
         if c is not None:
             self.stride = c.stride
@@ -36,7 +36,7 @@ class BlazeBlock_tiny():
         x = x.relu()
         return x
 
-class tiny_Seq():
+class Seq():
     def __init__(self, size=0):
         super().__init__()
         self.list = [None] * size
@@ -47,7 +47,7 @@ class tiny_Seq():
         for y in self.list: x = y(x)
         return x
 
-class FinalBlazeBlock_tiny():
+class FinalBlazeBlock():
     def __init__(self, f=None):
         if f is not None:
             self.act = f.act
@@ -66,7 +66,7 @@ class FinalBlazeBlock_tiny():
         x = x.relu()
         return x
 
-class BlazeFace_tiny():
+class BlazeFace():
     def __init__(self, m=None):
         if m is not None:
             self.backbone_tiny = m.backbone_tiny
@@ -92,37 +92,37 @@ class BlazeFace_tiny():
         self.regressor_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=32, kernel_size=1, groups=1, bias=True)
         self.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
 
-        self.final = FinalBlazeBlock_tiny()
-        self.backbone_tiny = tiny_Seq(31)
+        self.final = FinalBlazeBlock()
+        self.backbone_tiny = Seq(31)
         for i in range(7):
-            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i] = BlazeBlock()
             self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, groups=24, bias=True)
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
-        self.backbone_tiny[7] = BlazeBlock_tiny()
+        self.backbone_tiny[7] = BlazeBlock()
         self.backbone_tiny[7].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=2, padding=0, groups=24, bias=True)
         self.backbone_tiny[7].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
         self.backbone_tiny[7].stride = 2
         for i in range(8, 15):
-            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i] = BlazeBlock()
             self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, groups=24, bias=True)
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(24, 24, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
-        self.backbone_tiny[15] = BlazeBlock_tiny(channel_pad=24)
+        self.backbone_tiny[15] = BlazeBlock(channel_pad=24)
         self.backbone_tiny[15].conv0_tiny = tiny_nn.Conv2d(24, 24, kernel_size=3, stride=2, padding=0, groups=24, bias=True)
         self.backbone_tiny[15].conv1_tiny = tiny_nn.Conv2d(24, 48, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
         self.backbone_tiny[15].stride = 2
         for i in range(16, 23):
-            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i] = BlazeBlock()
             self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(48, 48, kernel_size=3, stride=1, padding=1, groups=48, bias=True)
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(48, 48, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
-        self.backbone_tiny[23] = BlazeBlock_tiny(channel_pad=48)
+        self.backbone_tiny[23] = BlazeBlock(channel_pad=48)
         self.backbone_tiny[23].conv0_tiny = tiny_nn.Conv2d(48, 48, kernel_size=3, stride=2, padding=0, groups=48, bias=True)
         self.backbone_tiny[23].conv1_tiny = tiny_nn.Conv2d(48, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
         self.backbone_tiny[23].stride = 2
         for i in range(24, 31):
-            self.backbone_tiny[i] = BlazeBlock_tiny()
+            self.backbone_tiny[i] = BlazeBlock()
             self.backbone_tiny[i].conv0_tiny = tiny_nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, groups=96, bias=True)
             self.backbone_tiny[i].conv1_tiny = tiny_nn.Conv2d(96, 96, kernel_size=1, stride=1, padding=0, groups=1, bias=True)
             self.backbone_tiny[i].stride = 1
@@ -305,7 +305,7 @@ def save_detections_on_original(
 
 state_dict = safe_load("model.safetensors")
 
-model_tiny2 = BlazeFace_tiny()
+model_tiny2 = BlazeFace()
 load_state_dict(model_tiny2, state_dict)
 
 
