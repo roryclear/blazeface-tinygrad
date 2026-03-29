@@ -246,6 +246,10 @@ class BlazeFace_tiny():
 
         output_detections = []
 
+
+        tiny_boxes = postprocess(to_tiny(detections))[0]
+        print(tiny_boxes.numpy())
+
         # Sort the detections from highest to lowest score.
         remaining = torch.argsort(detections[:, 4], descending=True)
 
@@ -280,6 +284,36 @@ class BlazeFace_tiny():
 
         return output_detections
 
+
+def postprocess(boxes):
+    boxes = boxes.unsqueeze(0)
+    max_det = 300 # todo
+    iou_threshold = 0.3
+    probs = boxes[:, 4]
+    order_all = tinyTensor.topk(probs, min(max_det, probs.shape[1]))[1]
+    batch_idx = tinyTensor.arange(order_all.shape[0]).reshape(-1, 1)
+    boxes = boxes[batch_idx, order_all]
+    ious = compute_iou_matrix(boxes[:, :, :4])
+    ious = tinyTensor.triu(ious, diagonal=1)
+    high_iou_mask = (ious > iou_threshold)
+    no_overlap_mask = high_iou_mask.sum(axis=1) == 0
+    return boxes * no_overlap_mask.unsqueeze(-1)
+
+def compute_iou_matrix(boxes):
+  x1s = boxes[:, :, 0]
+  y1s = boxes[:, :, 1]
+  x2s = boxes[:, :, 2]
+  y2s = boxes[:, :, 3]
+  areas = (x2s - x1s) * (y2s - y1s)
+  x1 = tinyTensor.maximum(x1s[:, :, None], x1s[:, None, :])
+  y1 = tinyTensor.maximum(y1s[:, :, None], y1s[:, None, :])
+  x2 = tinyTensor.minimum(x2s[:, :, None], x2s[:, None, :])
+  y2 = tinyTensor.minimum(y2s[:, :, None], y2s[:, None, :])
+  w = tinyTensor.maximum(tinyTensor(0), x2 - x1)
+  h = tinyTensor.maximum(tinyTensor(0), y2 - y1)
+  intersection = w * h
+  union = areas[:, :, None] + areas[:, None, :] - intersection
+  return intersection / union
 
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
