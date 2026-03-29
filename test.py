@@ -188,7 +188,7 @@ class BlazeFace_tiny():
 
     def predict_on_image(self, img):
         img = torch.from_numpy(img).permute((2, 0, 1))
-        return self.predict_on_batch(img.unsqueeze(0))[0]
+        return self.predict_on_batch(img.unsqueeze(0))
 
     def predict_on_batch(self, x):
         x = to_tiny(x)
@@ -202,14 +202,9 @@ class BlazeFace_tiny():
         # 3. Postprocess the raw predictions:
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
-        # 4. Non-maximum suppression to remove overlapping detections:
-        filtered_detections = []
-        for i in range(len(detections)):
-            faces = self._weighted_non_max_suppression(detections[i])
-            faces = torch.stack(faces) if len(faces) > 0 else torch.zeros((0, 17))
-            filtered_detections.append(faces)
-
-        return filtered_detections
+        faces = self._weighted_non_max_suppression(detections[0])
+        faces = torch.stack(faces)
+        return faces
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)
