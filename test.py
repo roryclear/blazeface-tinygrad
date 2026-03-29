@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import cv2
 from torch import Tensor
 from tinygrad import Tensor as tinyTensor, nn as tiny_nn
+from tinygrad.nn.state import safe_save, safe_load, get_state_dict, load_state_dict
 
 
 #class torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', device=None, dtype=None)[source]
@@ -122,23 +123,31 @@ class FinalBlazeBlock_tiny():
         return x
 
 class BlazeFace_tiny():
-    def __init__(self, m):
-
-        self.backbone_tiny = m.backbone_tiny
-        self.conv_tiny = m.conv_tiny
-        self.classifier_8 = m.classifier_8
-        self.classifier_16 = m.classifier_16
-        self.regressor_8 = m.regressor_8
-        self.regressor_16 = m.regressor_16
-        self.anchors = m.anchors
-        self.x_scale = m.x_scale
-        self.y_scale = m.y_scale
-        self.w_scale = m.w_scale
-        self.h_scale = m.h_scale
-        self.score_clipping_thresh = m.score_clipping_thresh
-        self.min_score_thresh = m.min_score_thresh
-        self.min_suppression_threshold = m.min_suppression_threshold
-        self.final = m.final
+    def __init__(self, m=None):
+        if m is not None:
+            self.backbone_tiny = m.backbone_tiny
+            self.conv_tiny = m.conv_tiny
+            self.classifier_8 = m.classifier_8
+            self.classifier_16 = m.classifier_16
+            self.regressor_8 = m.regressor_8
+            self.regressor_16 = m.regressor_16
+            self.anchors = m.anchors
+            self.x_scale = m.x_scale
+            self.y_scale = m.y_scale
+            self.w_scale = m.w_scale
+            self.h_scale = m.h_scale
+            self.score_clipping_thresh = m.score_clipping_thresh
+            self.min_score_thresh = m.min_score_thresh
+            self.min_suppression_threshold = m.min_suppression_threshold
+            self.final = m.final
+            return
+        
+        self.conv_tiny = tiny_nn.Conv2d(in_channels=3, out_channels=24, kernel_size=5, stride=2, padding=0, bias=True)
+        self.classifier_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=2, kernel_size=1, groups=1, bias=True)
+        self.classifier_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=6, kernel_size=1, groups=1, bias=True)
+        self.regressor_8_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=32, kernel_size=1, groups=1, bias=True)
+        self.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
+    
 
     def __call__(self, x):
         # TFLite uses slightly different padding on the first conv layer
@@ -469,6 +478,15 @@ model_tiny.regressor_8_tiny.bias = to_tiny(model.regressor_8.bias)
 model_tiny.regressor_16_tiny = tiny_nn.Conv2d(in_channels=96, out_channels=96, kernel_size=1, groups=1, bias=True)
 model_tiny.regressor_16_tiny.weight = to_tiny(model.regressor_16.weight)
 model_tiny.regressor_16_tiny.bias = to_tiny(model.regressor_16.bias)
+
+state_dict = get_state_dict(model_tiny)
+
+model_tiny2 = BlazeFace_tiny()
+load_state_dict(model_tiny2, state_dict)
+state_dict2 = get_state_dict(model_tiny2)
+
+for k in state_dict.keys():
+    print(k, type(state_dict[k]), k in state_dict2)
 
 orig = cv2.imread("messi.webp")
 orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
