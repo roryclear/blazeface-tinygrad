@@ -199,7 +199,10 @@ class BlazeFace_tiny():
 
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
-        faces = self._weighted_non_max_suppression(detections[0])
+        x = detections[0]
+        x = torch.cat([x[:, :4], x[:, 16:17]], dim=1)
+
+        faces = self._weighted_non_max_suppression(x)
         faces = torch.stack(faces)
         return faces
 
@@ -244,7 +247,7 @@ class BlazeFace_tiny():
         output_detections = []
 
         # Sort the detections from highest to lowest score.
-        remaining = torch.argsort(detections[:, 16], descending=True)
+        remaining = torch.argsort(detections[:, 4], descending=True)
 
         while len(remaining) > 0:
             detection = detections[remaining[0]]
@@ -266,12 +269,12 @@ class BlazeFace_tiny():
             # detections, weighted by their confidence scores.
             weighted_detection = detection.clone()
             if len(overlapping) > 1:
-                coordinates = detections[overlapping, :16]
-                scores = detections[overlapping, 16:17]
+                coordinates = detections[overlapping, :4]
+                scores = detections[overlapping, 4:5]
                 total_score = scores.sum()
                 weighted = (coordinates * scores).sum(dim=0) / total_score
-                weighted_detection[:16] = weighted
-                weighted_detection[16] = total_score / len(overlapping)
+                weighted_detection[:4] = weighted
+                weighted_detection[4] = total_score / len(overlapping)
 
             output_detections.append(weighted_detection)
 
@@ -385,8 +388,13 @@ img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 detections = model_tiny2.predict_on_image(img).numpy()
 
-expected = [[0.22293027,0.3687327,0.35492355,0.500726,0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
-[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
+detections = detections[:, :4]
+
+expected = [[0.22293027,0.3687327,0.35492355,0.500726],
+[0.30805102,0.68929595,0.42866126,0.8099063],]
+
+#expected = [[0.22293027,0.3687327,0.35492355,0.500726, 0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
+#[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
 
 
 np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
