@@ -200,11 +200,12 @@ class BlazeFace_tiny():
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
         detections = torch.cat([detections[:, :4], detections[:, 16:17]], dim=1)
-
+        
         detections = detections[detections[:, 4] != 0]
 
         faces = self._weighted_non_max_suppression(detections)
         faces = torch.stack(faces)
+        faces = faces[faces[:, 4] != 0]
         return faces
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
@@ -245,7 +246,6 @@ class BlazeFace_tiny():
         if len(detections) == 0: return []
 
         tiny_boxes = postprocess(to_tiny(detections))[0].numpy()
-        tiny_boxes = tiny_boxes[tiny_boxes[:, 4] != 0]
         tiny_boxes = [torch.tensor(row) for row in tiny_boxes]
         return tiny_boxes
 
