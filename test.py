@@ -36,15 +36,6 @@ class BlazeBlock_tiny():
         x = x.relu()
         return x
 
-def to_tiny(x): return tinyTensor(x.detach().numpy())
-
-def to_torch(x): return Tensor(x.numpy())
-
-def to_tiny_seq(x):
-    ret = tiny_Seq(size=len(x))
-    for i in range(len(x)): ret.list[i] = x[i]
-    return ret
-
 class tiny_Seq():
     def __init__(self, size=0):
         super().__init__()
@@ -194,9 +185,6 @@ class BlazeFace_tiny():
         x = x / 127.5 - 1.0
         out = self.__call__(x)
 
-        out[0] = to_torch(out[0])
-        out[1] = to_torch(out[1])
-
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
         detections = tinyTensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
@@ -206,7 +194,6 @@ class BlazeFace_tiny():
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
         thresh = self.score_clipping_thresh
-        raw_score_tensor = to_tiny(raw_score_tensor)
         scores = raw_score_tensor.clip(-thresh, thresh).sigmoid().squeeze(-1)
         mask = scores >= self.min_score_thresh  # (B, N)
         scores = scores.unsqueeze(-1)  # (B, N, 1)
@@ -215,8 +202,6 @@ class BlazeFace_tiny():
         return detections[0]
     
     def _decode_boxes(self, raw_boxes, anchors):
-        raw_boxes = to_tiny(raw_boxes)
-        anchors = to_tiny(anchors)
         boxes = tinyTensor.zeros_like(raw_boxes).contiguous()
         ax = anchors[:, 0]
         ay = anchors[:, 1]
