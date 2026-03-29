@@ -201,8 +201,6 @@ class BlazeFace_tiny():
 
         detections = torch.cat([detections[:, :4], detections[:, 16:17]], dim=1)
         
-        detections = detections[detections[:, 4] != 0]
-
         detections = to_tiny(detections)
         tiny_boxes = postprocess(detections)[0].numpy()
         faces = [torch.tensor(row) for row in tiny_boxes]
@@ -245,13 +243,12 @@ class BlazeFace_tiny():
         boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
         return boxes
 
-
-
 def postprocess(boxes):
     boxes = boxes.unsqueeze(0)
-    max_det = 300 # todo
+    max_det = 896
     iou_threshold = 0.3
-    probs = boxes[:, 4]
+    conf_threshold = 0.75 
+    probs = boxes[:, :, 4] 
     order_all = tinyTensor.topk(probs, min(max_det, probs.shape[1]))[1]
     batch_idx = tinyTensor.arange(order_all.shape[0]).reshape(-1, 1)
     boxes = boxes[batch_idx, order_all]
@@ -259,7 +256,9 @@ def postprocess(boxes):
     ious = tinyTensor.triu(ious, diagonal=1)
     high_iou_mask = (ious > iou_threshold)
     no_overlap_mask = high_iou_mask.sum(axis=1) == 0
-    return boxes * no_overlap_mask.unsqueeze(-1)
+    conf_mask = (boxes[:, :, 4] >= conf_threshold)
+    final_mask = no_overlap_mask * conf_mask
+    return boxes * final_mask.unsqueeze(-1)
 
 def compute_iou_matrix(boxes):
   x1s = boxes[:, :, 0]
@@ -364,7 +363,14 @@ detections = model_tiny2.predict_on_image(img).numpy()
 
 detections = detections[:, :4]
 
-expected = [[0.22257513,0.36959693,0.35338074,0.5004025,],[0.30618382,0.6910623,0.4268934,0.8117719,], ]
+s = "["
+for y in detections:
+    s += "["
+    for x in y: s += str(x) + ","
+    s += "],"
+print(s+"]")
+
+expected = [[0.22250968,0.36720884,0.35707378,0.501773,],[0.3098331,0.68761027,0.43034846,0.80812573,],]
 
 #expected = [[0.22293027,0.3687327,0.35492355,0.500726, 0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 #[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
