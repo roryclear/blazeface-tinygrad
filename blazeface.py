@@ -165,16 +165,16 @@ class BlazeFace():
 
     def __call__(self, img):
         h0, w0 = img.shape[:2]
-        scale = min(256 / w0, 256 / h0)
-        new_w, new_h = int(w0 * scale), int(h0 * scale)
 
-        img = resize(img, [256,256])
+        scale = min(256/w0, 256/h0)
+        new_w, new_h = int(w0*scale), int(h0*scale)
+        img = resize(img, [new_w, new_h])
         pad_top = (256 - new_h) // 2
-        pad_bottom = (256 - new_h) - pad_top
+        pad_bottom = 256 - new_h - pad_top
         pad_left = (256 - new_w) // 2
-        pad_right = (256 - new_w) - pad_left
+        pad_right = 256 - new_w - pad_left
+        img = img.pad(((pad_top, pad_bottom), (pad_left, pad_right), (0,0)), value=0)
 
-        img = img.pad(((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), value=0)
         x = img[..., ::-1] # bgr to rgb
 
         x = x.permute((2, 0, 1))
