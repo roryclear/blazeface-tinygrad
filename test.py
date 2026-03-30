@@ -277,38 +277,19 @@ def resize(img, new_size):
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
 
-def save_detections_on_original(
-    original_img,
-    detections,
-    scale,
-    pad_top,
-    pad_left,
-    resized_shape,
-    output_path="output.jpg"
-):
+def save_detections_on_original(original_img, detections, output_path="output.jpg"):
     if detections.ndim == 1: detections = np.expand_dims(detections, axis=0)
 
     img_out = original_img.copy()
     orig_h, orig_w = original_img.shape[:2]
-    resized_h, resized_w = resized_shape
 
     print("Found %d faces" % detections.shape[0])
 
     for i in range(detections.shape[0]):
-        ymin = detections[i, 0] * resized_h
-        xmin = detections[i, 1] * resized_w
-        ymax = detections[i, 2] * resized_h
-        xmax = detections[i, 3] * resized_w
-
-        ymin -= pad_top
-        ymax -= pad_top
-        xmin -= pad_left
-        xmax -= pad_left
-
-        ymin /= scale
-        ymax /= scale
-        xmin /= scale
-        xmax /= scale
+        ymin = detections[i, 0]
+        xmin = detections[i, 1]
+        ymax = detections[i, 2]
+        xmax = detections[i, 3]
 
         x1, y1, x2, y2 = map(int, [xmin, ymin, xmax, ymax])
 
@@ -354,14 +335,11 @@ expected = [[0.30721304,0.69116294,0.43141797,0.81536794,],[0.21958731,0.3653375
 
 np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
 
-save_detections_on_original(
-    original_img=orig,
-    detections=detections,
-    scale=scale,
-    pad_top=pad_top,
-    pad_left=pad_left,
-    resized_shape=(256, 256),
-    output_path="result.jpg"
-)
+detections = detections * 256
+detections[:, [0, 2]] -= pad_top   # ymin, ymax
+detections[:, [1, 3]] -= pad_left  # xmin, xmax
+detections /= scale
+
+save_detections_on_original(original_img=orig, detections=detections, output_path="result.jpg")
 
 
