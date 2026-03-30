@@ -253,6 +253,13 @@ def compute_iou_matrix(boxes):
   union = areas[:, :, None] + areas[:, None, :] - intersection
   return intersection / union
 
+def resize(img, new_size):
+  img = img.permute(2,0,1)
+  img = Tensor.interpolate(img, size=(new_size[1], new_size[0]), mode='linear', align_corners=False)
+  img = img.permute(1, 2, 0)
+  return img
+
+
 # IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
 
 
@@ -319,7 +326,11 @@ h0, w0 = orig.shape[:2]
 scale = min(256 / w0, 256 / h0)
 new_w, new_h = int(w0 * scale), int(h0 * scale)
 
-resized = cv2.resize(orig, (new_w, new_h))
+resized = Tensor(orig)
+resized = resize(resized, [256,256])
+resized = resized.numpy()
+
+
 
 pad_top = (256 - new_h) // 2
 pad_bottom = (256 - new_h) - pad_top
@@ -340,7 +351,7 @@ detections = model.predict_on_image(img).numpy()
 detections = detections[detections[:, 4] != 0]
 detections = detections[:, :4]
 
-expected = [[0.22250968,0.36720884,0.35707378,0.501773,],[0.3098331,0.68761027,0.43034846,0.80812573,],]
+expected = [[0.2224136,0.36713004,0.3571508,0.5018673,],[0.30980274,0.6876844,0.43068573,0.8085674,]]
 
 #expected = [[0.22293027,0.3687327,0.35492355,0.500726, 0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 #[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
