@@ -140,21 +140,13 @@ class BlazeFace():
         self.min_suppression_threshold = 0.3
 
 
-    def __call__(self, x):
-        # TFLite uses slightly different padding on the first conv layer
-        # than PyTorch, so do it manually.
+    def forward(self, x):
         x = x.pad(((0, 0), (0, 0), (1, 2), (1, 2)))
-        
         b = x.shape[0]      # batch size, needed for reshaping later
         x = self.conv_tiny(x)
         x = x.relu()
         x = self.backbone_tiny(x)           # (b, 16, 16, 96)
-
         h = self.final(x)              # (b, 8, 8, 96)
-
-        # Note: Because PyTorch is NCHW but TFLite is NHWC, we need to
-        # permute the output from the conv layers before reshaping it.
-        
         c1 = self.classifier_8_tiny(x)       # (b, 2, 16, 16)
         c1 = c1.permute(0, 2, 3, 1)     # (b, 16, 16, 2)
         c1 = c1.reshape(b, -1, 1)       # (b, 512, 1)
@@ -175,10 +167,7 @@ class BlazeFace():
         r = Tensor.cat(r1, r2, dim=1)
         return [r, c]
 
-
-
-    def predict_on_image(self, img):
-
+    def __call__(self, img):
         h0, w0 = img.shape[:2]
         scale = min(256 / w0, 256 / h0)
         new_w, new_h = int(w0 * scale), int(h0 * scale)
@@ -195,13 +184,19 @@ class BlazeFace():
         x = x.permute((2, 0, 1))
         x = x.unsqueeze(0)
         x = x / 127.5 - 1.0
-        out = self.__call__(x)
+        out = self.forward(x)
 
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
         detections = Tensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
-        return postprocess(detections)[0]
+        detections = postprocess(detections)[0]
+
+        detections = detections * 256
+        detections[:, [0, 2]] -= pad_top   # ymin, ymax
+        detections[:, [1, 3]] -= pad_left  # xmin, xmax
+        detections /= scale
+        return detections[:, :5]
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
@@ -274,10 +269,7 @@ def resize(img, new_size):
   return img
 
 
-# IOU code from https://github.com/amdegroot/ssd.pytorch/blob/master/layers/box_utils.py
-
-
-def save_detections_on_original(original_img, detections, output_path="output.jpg"):
+def save_detections(original_img, detections, output_path="output.jpg"):
     if detections.ndim == 1: detections = np.expand_dims(detections, axis=0)
 
     img_out = original_img.copy()
@@ -315,31 +307,18 @@ model.min_score_thresh = 0.75
 
 orig = cv2.imread("messi.webp")
 
-h0, w0 = orig.shape[:2]
-scale = min(256 / w0, 256 / h0)
-new_w, new_h = int(w0 * scale), int(h0 * scale)
-pad_top = (256 - new_h) // 2
-pad_bottom = (256 - new_h) - pad_top
-pad_left = (256 - new_w) // 2
-pad_right = (256 - new_w) - pad_left
 
 img = Tensor(orig)
-detections = model.predict_on_image(img).numpy()
+detections = model(img).numpy()
 detections = detections[detections[:, 4] != 0]
-detections = detections[:, :4]
 
-expected = [[0.30721304,0.69116294,0.43141797,0.81536794,],[0.21958731,0.3653375,0.35407,0.49982017,], ]
+expected = [[196.61635,442.3443,276.1075,521.83545,588.39246,],[140.53587,233.816,226.6048,319.88492,539.11383,], ]
 
 #expected = [[0.22293027,0.3687327,0.35492355,0.500726, 0.4048541,0.253551,0.45936358,0.25396332,0.42835188,0.2809909,0.42859644,0.31245646,0.37655264,0.27385083,0.49636966,0.27672035,0.83855903,],
 #[0.30805102,0.68929595,0.42866126,0.8099063,0.71050656,0.34094658,0.75901216,0.34136337,0.7211923,0.3699867,0.7258061,0.3949228,0.703986,0.3506133,0.8086657,0.3542543,0.7997207,],]
 
 np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
 
-detections = detections * 256
-detections[:, [0, 2]] -= pad_top   # ymin, ymax
-detections[:, [1, 3]] -= pad_left  # xmin, xmax
-detections /= scale
-
-save_detections_on_original(original_img=orig, detections=detections, output_path="result.jpg")
+save_detections(original_img=orig, detections=detections, output_path="result.jpg")
 
 
