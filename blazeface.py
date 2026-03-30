@@ -192,6 +192,7 @@ class BlazeFace():
         detections[:, [0, 2]] -= pad_top   # ymin, ymax
         detections[:, [1, 3]] -= pad_left  # xmin, xmax
         detections /= scale
+        return detections
         return detections[:, :5]
 
     def _tensors_to_detections(self, raw_box_tensor, raw_score_tensor, anchors):
@@ -228,7 +229,7 @@ def postprocess(boxes):
     max_det = 896
     iou_threshold = 0.3
     conf_threshold = 0.9
-    probs = boxes[:, :, 4] 
+    probs = boxes[:, :, 4]
     order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
     batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
     boxes = boxes[batch_idx, order_all]

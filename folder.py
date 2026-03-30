@@ -9,7 +9,7 @@ def save_detections(original_img, detections, output_path="output.jpg", face_siz
     if detections.ndim == 1: 
         detections = np.expand_dims(detections, axis=0)
     if detections.shape[0] == 0: return
-
+    
     # First face bounding box
     ymin, xmin, ymax, xmax = detections[0, :4]
 
@@ -32,7 +32,6 @@ def save_detections(original_img, detections, output_path="output.jpg", face_siz
     scaled_face_center_x = face_center_x * scale_factor
     scaled_face_center_y = face_center_y * scale_factor
 
-
     # Translation to center face in final canvas
     dx = final_size // 2 - scaled_face_center_x
     dy = final_size // 2 - scaled_face_center_y
@@ -40,24 +39,34 @@ def save_detections(original_img, detections, output_path="output.jpg", face_siz
     shifted_img = cv2.warpAffine(scaled_img, translation_matrix, (final_size, final_size),
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0))
 
-    # Draw bounding boxes
-    '''
-    for i in range(detections.shape[0]):
-        box_ymin = detections[i,0]*scale_factor + dy
-        box_xmin = detections[i,1]*scale_factor + dx
-        box_ymax = detections[i,2]*scale_factor + dy
-        box_xmax = detections[i,3]*scale_factor + dx
-
-        x1 = max(0, min(final_size, int(box_xmin)))
-        x2 = max(0, min(final_size, int(box_xmax)))
-        y1 = max(0, min(final_size, int(box_ymin)))
-        y2 = max(0, min(final_size, int(box_ymax)))
-
-        color = (0,0,255) if i == 0 else (0,255,0)
-        cv2.rectangle(shifted_img, (x1,y1), (x2,y2), color, 2)
-    '''
-    #cv2.imwrite(f"faces/{str(random.randint(1, 1000000000))}.jpg", shifted_img)
-    cv2.imwrite(output_path, shifted_img)
+    cv2.imwrite(f"face_imgs/{output_path}", shifted_img)
+    
+    # Save double-sized face box as 112x112
+    # Calculate double-sized bounding box (keep same center)
+    new_width = face_width * 1.5
+    new_height = face_height * 1.5
+    
+    # Calculate coordinates in original image
+    x1 = int(face_center_x - new_width / 2)
+    y1 = int(face_center_y - new_height / 2)
+    x2 = int(face_center_x + new_width / 2)
+    y2 = int(face_center_y + new_height / 2)
+    
+    # Clamp to image boundaries
+    x1 = max(0, min(orig_w, x1))
+    x2 = max(0, min(orig_w, x2))
+    y1 = max(0, min(orig_h, y1))
+    y2 = max(0, min(orig_h, y2))
+    
+    # Extract face region
+    face_box = original_img[y1:y2, x1:x2]
+    
+    # Resize to 112x112
+    if face_box.size > 0:
+        face_box_resized = cv2.resize(face_box, (112, 112), interpolation=cv2.INTER_LINEAR)        
+        cv2.imwrite(f"faces/{output_path}", face_box_resized)
+    else:
+        print("Warning: Face box extraction failed - invalid region")
 
 @TinyJit
 def jit_call(model, x): return model(x)
@@ -85,6 +94,6 @@ if __name__ == '__main__':
         detections = jit_call(model, img).numpy()
         detections = detections[detections[:, 4] != 0]
 
-        save_detections(original_img=orig, detections=detections, output_path=f"faces/{file}")
+        save_detections(original_img=orig, detections=detections, output_path=f"{file}")
 
 
