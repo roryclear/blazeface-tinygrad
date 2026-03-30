@@ -177,7 +177,21 @@ class BlazeFace():
 
 
 
-    def predict_on_image(self, x):
+    def predict_on_image(self, img):
+
+        h0, w0 = img.shape[:2]
+        scale = min(256 / w0, 256 / h0)
+        new_w, new_h = int(w0 * scale), int(h0 * scale)
+
+        img = resize(img, [256,256])
+        pad_top = (256 - new_h) // 2
+        pad_bottom = (256 - new_h) - pad_top
+        pad_left = (256 - new_w) // 2
+        pad_right = (256 - new_w) - pad_left
+
+        img = img.pad(((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), value=0)
+        x = img[..., ::-1] # bgr to rgb
+
         x = x.permute((2, 0, 1))
         x = x.unsqueeze(0)
         x = x / 127.5 - 1.0
@@ -321,24 +335,14 @@ model.min_score_thresh = 0.75
 orig = cv2.imread("messi.webp")
 
 h0, w0 = orig.shape[:2]
-
 scale = min(256 / w0, 256 / h0)
 new_w, new_h = int(w0 * scale), int(h0 * scale)
-
-resized = Tensor(orig)
-resized = resize(resized, [256,256])
-resized = resized.numpy()
-
-
-
 pad_top = (256 - new_h) // 2
 pad_bottom = (256 - new_h) - pad_top
 pad_left = (256 - new_w) // 2
 pad_right = (256 - new_w) - pad_left
 
-resized = Tensor(resized)
-img = resized.pad(((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), value=0)
-img = img[..., ::-1] # bgr to rgb
+img = Tensor(orig)
 detections = model.predict_on_image(img).numpy()
 detections = detections[detections[:, 4] != 0]
 detections = detections[:, :4]
