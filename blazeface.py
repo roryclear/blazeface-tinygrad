@@ -186,7 +186,7 @@ class BlazeFace():
 
         detections = Tensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
-        detections = postprocess(detections)[0]
+        detections = self.postprocess(detections)[0]
 
         detections = detections * 256
         detections[:, [0, 2]] -= pad_top   # ymin, ymax
@@ -225,22 +225,21 @@ class BlazeFace():
         boxes[..., 4:] = keypoints_decoded.view(*raw_boxes.shape[:-1], -1)
         return boxes
 
-def postprocess(boxes):
-    boxes = boxes.unsqueeze(0)
-    max_det = 896
-    iou_threshold = 0.3
-    conf_threshold = 0.75 
-    probs = boxes[:, :, 4] 
-    order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
-    batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
-    boxes = boxes[batch_idx, order_all]
-    ious = compute_iou_matrix(boxes[:, :, :4])
-    ious = Tensor.triu(ious, diagonal=1)
-    high_iou_mask = (ious > iou_threshold)
-    no_overlap_mask = high_iou_mask.sum(axis=1) == 0
-    conf_mask = (boxes[:, :, 4] >= conf_threshold)
-    final_mask = no_overlap_mask * conf_mask
-    return boxes * final_mask.unsqueeze(-1)
+    def postprocess(self, boxes):
+        boxes = boxes.unsqueeze(0)
+        max_det = 896
+        iou_threshold = 0.3
+        probs = boxes[:, :, 4] 
+        order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
+        batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
+        boxes = boxes[batch_idx, order_all]
+        ious = compute_iou_matrix(boxes[:, :, :4])
+        ious = Tensor.triu(ious, diagonal=1)
+        high_iou_mask = (ious > iou_threshold)
+        no_overlap_mask = high_iou_mask.sum(axis=1) == 0
+        conf_mask = (boxes[:, :, 4] >= self.min_score_thresh)
+        final_mask = no_overlap_mask * conf_mask
+        return boxes * final_mask.unsqueeze(-1)
 
 def compute_iou_matrix(boxes):
   x1s = boxes[:, :, 0]
