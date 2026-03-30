@@ -337,12 +337,12 @@ pad_bottom = (256 - new_h) - pad_top
 pad_left = (256 - new_w) // 2
 pad_right = (256 - new_w) - pad_left
 
-img = cv2.copyMakeBorder(
-    resized,
-    pad_top, pad_bottom, pad_left, pad_right,
-    borderType=cv2.BORDER_CONSTANT,
-    value=[0, 0, 0]
+resized = Tensor(resized)
+img = resized.pad(
+    ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)),
+    value=0
 )
+img = img.numpy()
 
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
