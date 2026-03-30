@@ -304,11 +304,11 @@ def save_detections_on_original(
 
 state_dict = safe_load("model.safetensors")
 
-model_tiny2 = BlazeFace()
-load_state_dict(model_tiny2, state_dict)
+model = BlazeFace()
+load_state_dict(model, state_dict)
 
 
-model_tiny2.min_score_thresh = 0.75
+model.min_score_thresh = 0.75
 
 
 
@@ -336,7 +336,7 @@ img = cv2.copyMakeBorder(
 
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-detections = model_tiny2.predict_on_image(img).numpy()
+detections = model.predict_on_image(img).numpy()
 detections = detections[detections[:, 4] != 0]
 detections = detections[:, :4]
 
