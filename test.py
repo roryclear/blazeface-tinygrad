@@ -11,7 +11,7 @@ def save_detections(original_img, detections, output_path="output.jpg"):
     img_out = original_img.copy()
     orig_h, orig_w = original_img.shape[:2]
 
-    print("Found %d faces" % detections.shape[0])
+    if detections.shape[0] == 0: return
 
     for i in range(detections.shape[0]):
         ymin = detections[i, 0]
@@ -33,19 +33,29 @@ def save_detections(original_img, detections, output_path="output.jpg"):
 @TinyJit
 def jit_call(model, x): return model(x)
 
+import os
+
 if __name__ == '__main__':
     model = BlazeFace()
-    orig = cv2.imread("nms.jpg")
-    img = Tensor(orig)
-    detections = model(img).numpy()
-    detections = detections[detections[:, 4] != 0]
 
-    s = "["
-    expected = [[69.23135,66.04759,133.58755,130.40376,596.1233,],
-[65.73704,239.54918,124.27883,298.09097,578.57294,],
-[69.06696,372.31207,131.6906,434.93576,552.90955,],]
+    files = os.listdir("objects")
+    
+    for file in files:
+        print(file)
+        orig = cv2.imread(f"objects/{file}")
 
-    np.testing.assert_allclose(detections, expected, rtol=1e-6, atol=1e-6)
-    save_detections(original_img=orig, detections=detections, output_path="result.jpg")
+        h, w = orig.shape[:2]
+        scale = 640 / max(h, w)
+        resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
+        delta_w, delta_h = 640 - resized.shape[1], 640 - resized.shape[0]
+        top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+        left, right = delta_w // 2, delta_w - (delta_w // 2)
+        orig = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0,0,0])
+
+        img = Tensor(orig)
+        detections = jit_call(model, img).numpy()
+        detections = detections[detections[:, 4] != 0]
+
+        save_detections(original_img=orig, detections=detections, output_path=f"faces/{file}.jpg")
 
 

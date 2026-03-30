@@ -198,10 +198,8 @@ class BlazeFace():
         detection_boxes = self._decode_boxes(raw_box_tensor, anchors)  # (B, N, 16)
         thresh = self.score_clipping_thresh
         scores = raw_score_tensor.clip(-thresh, thresh).sigmoid().squeeze(-1)
-        mask = scores >= self.min_score_thresh  # (B, N)
         scores = scores.unsqueeze(-1)  # (B, N, 1)
         detections = Tensor.cat(detection_boxes, scores, dim=-1)  # (B, N, 17)
-        detections *= mask.unsqueeze(-1)
         return detections[0]
     
     def _decode_boxes(self, raw_boxes, anchors):
@@ -229,7 +227,7 @@ def postprocess(boxes):
     boxes = boxes.unsqueeze(0)
     max_det = 896
     iou_threshold = 0.3
-    conf_threshold = 0.75 
+    conf_threshold = 0.9
     probs = boxes[:, :, 4] 
     order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
     batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
