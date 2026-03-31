@@ -103,46 +103,55 @@ def jit_call(model, x): return model(x)
 
 import os
 
-def sort_detections_by_landmark_proximity(detections):
-    print("sorting (eye midpoint)")
-    
-    if len(detections) <= 1:
-        return detections
+def sort_detections_by_landmark_proximity(files_dets):
+    print(len(files_dets))
+    if len(files_dets) <= 1:
+        return files_dets
 
-    detections = detections.copy()
+    # Extract detections only
+    detections_list = [d for d, _ in files_dets]
 
-    # Extract eye keypoints (first two points)
-    keypoints = detections[:, 4:16].reshape(len(detections), -1, 2)
+    # Stack into array for processing
+    detections = np.array([d[0] for d in detections_list])
 
-    # Compute midpoints between first two keypoints (eyes)
-    eye_midpoints = (keypoints[:, 0] + keypoints[:, 1]) / 2  # shape: (N, 2)
+    # --- original logic (unchanged) ---
+    # slop, all one for now
+    # Index 0: left eye (green) - medium weight
+    # Index 1: right eye (blue) - medium weight  
+    # Index 2: nose (red) - high weight (good for orientation)
+    # Index 3: right ear? (pink) - very high weight (excellent for orientation)
+    # Index 4: left ear? (yellow?) - very high weight
+    # Index 5: mouth (cyan) - medium weight
 
-    # Track order
-    used = set([0])
+    landmark_weights = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    all_keypoints = detections[:, 4:16].reshape(len(detections), -1, 2)
+
+    relative_landmarks = []
+    for keypoints in all_keypoints:
+        eye_mid = (keypoints[0] + keypoints[1]) / 2
+        rel_points = keypoints - eye_mid
+        weighted_rel = rel_points * landmark_weights.reshape(-1, 1)
+        relative_landmarks.append(weighted_rel)
+
+    used = {0}
     order = [0]
     current = 0
 
     while len(order) < len(detections):
-        best_idx = None
-        best_dist = float('inf')
-
+        best_idx, best_dist = None, float('inf')
         for i in range(len(detections)):
             if i in used:
                 continue
-
-            # Distance between midpoints (squared Euclidean)
-            diff = eye_midpoints[current] - eye_midpoints[i]
+            diff = relative_landmarks[current] - relative_landmarks[i]
             dist = np.sum(diff ** 2)
-
             if dist < best_dist:
-                best_dist = dist
-                best_idx = i
-
+                best_dist, best_idx = dist, i
         order.append(best_idx)
         used.add(best_idx)
         current = best_idx
 
-    return detections[order]
+    # Reorder original pairs
+    return [files_dets[i] for i in order]
 
 if __name__ == '__main__':
     model = BlazeFace()
@@ -168,8 +177,8 @@ if __name__ == '__main__':
         if len(detections) > 0:
             files_dets.append([detections, orig])
     
-    detections = sort_detections_by_landmark_proximity(detections)
-
+    files_dets = sort_detections_by_landmark_proximity(files_dets)
+    
     for i, (detections,orig) in enumerate(files_dets):
         save_detections(original_img=orig, detections=detections, output_path=f"{i:04d}.jpg")
 
