@@ -156,31 +156,56 @@ def sort_detections_by_landmark_proximity(files_dets):
 if __name__ == '__main__':
     model = BlazeFace()
 
-    files = os.listdir("objects")
+    files = os.listdir("objects")# + os.listdir("objects_iran")
     files_dets = []
-    
-    for i, file in enumerate(files):
+
+    for file in files:
         print(file)
         orig = cv2.imread(f"objects/{file}")
 
         h, w = orig.shape[:2]
         scale = 640 / max(h, w)
         resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
+
         delta_w, delta_h = 640 - resized.shape[1], 640 - resized.shape[0]
         top, bottom = delta_h // 2, delta_h - (delta_h // 2)
         left, right = delta_w // 2, delta_w - (delta_w // 2)
-        orig = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0,0,0])
 
-        img = Tensor(orig)
+        padded = cv2.copyMakeBorder(
+            resized, top, bottom, left, right,
+            cv2.BORDER_CONSTANT, value=[0,0,0]
+        )
+
+        img = Tensor(padded)
         detections = jit_call(model, img).numpy()
         detections = detections[detections[:, 4] != 0]
-        if len(detections) > 0:
-            files_dets.append([detections, orig])
+
+        if len(detections) > 0: files_dets.append([detections, file])
     
     files_dets = sort_detections_by_landmark_proximity(files_dets)
     
-    for i, (detections,orig) in enumerate(files_dets):
-        save_detections(original_img=orig, detections=detections, output_path=f"{i:04d}.jpg")
+    
+    for i, (detections, file) in enumerate(files_dets):
+        orig = cv2.imread(f"objects/{file}")
+        h, w = orig.shape[:2]
+        scale = 640 / max(h, w)
+        resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
+
+        delta_w, delta_h = 640 - resized.shape[1], 640 - resized.shape[0]
+        top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+        left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+        padded = cv2.copyMakeBorder(
+            resized, top, bottom, left, right,
+            cv2.BORDER_CONSTANT, value=[0,0,0]
+        )
+
+        save_detections(
+            original_img=padded,
+            detections=detections,
+            output_path=f"{i:04d}.jpg"
+        )
+
 
 
 
