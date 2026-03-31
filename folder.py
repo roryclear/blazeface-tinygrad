@@ -155,13 +155,21 @@ def sort_detections_by_landmark_proximity(files_dets):
 
 if __name__ == '__main__':
     model = BlazeFace()
+    base_dir = "."  # or wherever your folders are
 
-    files = os.listdir("objects")# + os.listdir("objects_iran")
+    files = []
+    for folder in os.listdir(base_dir):
+        if folder.startswith("objects_") and os.path.isdir(os.path.join(base_dir, folder)):
+            folder_path = os.path.join(base_dir, folder)
+            for file in os.listdir(folder_path):
+                if file.lower().endswith((".jpg", ".jpeg", ".png")):
+                    files.append(os.path.join(folder, file))
+
     files_dets = []
 
     for file in files:
         print(file)
-        orig = cv2.imread(f"objects/{file}")
+        orig = cv2.imread(file)
 
         h, w = orig.shape[:2]
         scale = 640 / max(h, w)
@@ -186,7 +194,7 @@ if __name__ == '__main__':
     
     
     for i, (detections, file) in enumerate(files_dets):
-        orig = cv2.imread(f"objects/{file}")
+        orig = cv2.imread(file)
         h, w = orig.shape[:2]
         scale = 640 / max(h, w)
         resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
@@ -213,4 +221,11 @@ if __name__ == '__main__':
 ffmpeg -framerate 24 -i %04d.jpg \
 -vf "scale=1000:1000:force_original_aspect_ratio=decrease,pad=1000:1000:(ow-iw)/2:(oh-ih)/2" \
 -c:v libx264 -pix_fmt yuv420p output.mp4
+'''
+
+#reverse
+'''
+ffmpeg -framerate 30 -i %04d.jpg \
+-vf "reverse,scale=1000:1000:force_original_aspect_ratio=decrease,pad=1000:1000:(ow-iw)/2:(oh-ih)/2" \
+-c:v libx264 -pix_fmt yuv420p output30.mp4
 '''
