@@ -130,7 +130,7 @@ class BlazeFace():
         self.y_scale = 256.0
         self.h_scale = 256.0
         self.w_scale = 256.0
-        self.min_score_thresh = 0.75
+        self.min_score_thresh = 0.85
         self.min_suppression_threshold = 0.3
 
         load_state_dict(self, safe_load("model.safetensors"))
@@ -184,7 +184,7 @@ class BlazeFace():
 
         detections = self._tensors_to_detections(out[0], out[1], self.anchors)
 
-        detections = Tensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
+        #detections = Tensor.cat(detections[:, :4], detections[:, 16:17], dim=1)
         
         detections = postprocess(detections)[0]
 
@@ -229,7 +229,7 @@ def postprocess(boxes):
     max_det = 896
     iou_threshold = 0.3
     conf_threshold = 0.9
-    probs = boxes[:, :, 4]
+    probs = boxes[:, :, 16]
     order_all = Tensor.topk(probs, min(max_det, probs.shape[1]))[1]
     batch_idx = Tensor.arange(order_all.shape[0]).reshape(-1, 1)
     boxes = boxes[batch_idx, order_all]
@@ -237,7 +237,7 @@ def postprocess(boxes):
     ious = Tensor.triu(ious, diagonal=1)
     high_iou_mask = (ious > iou_threshold)
     no_overlap_mask = high_iou_mask.sum(axis=1) == 0
-    conf_mask = (boxes[:, :, 4] >= conf_threshold)
+    conf_mask = (boxes[:, :, 16] >= conf_threshold)
     final_mask = no_overlap_mask * conf_mask
     return boxes * final_mask.unsqueeze(-1)
 
@@ -262,3 +262,10 @@ def resize(img, new_size):
   img = Tensor.interpolate(img, size=(new_size[1], new_size[0]), mode='linear', align_corners=False)
   img = img.permute(1, 2, 0)
   return img
+
+
+'''
+ffmpeg -framerate 24 -i %04d.jpg \
+-vf "scale=1000:1000:force_original_aspect_ratio=decrease,pad=1000:1000:(ow-iw)/2:(oh-ih)/2" \
+-c:v libx264 -pix_fmt yuv420p output.mp4
+'''
