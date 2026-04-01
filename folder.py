@@ -8,7 +8,7 @@ import random
 import cv2
 import numpy as np
 
-def save_detections(original_img, detections, output_path="output.jpg", face_size=50, final_size=1000):
+def save_detections(original_img, detections, output_path="output.jpg", face_size=80, final_size=1000):
     if detections.ndim == 1: 
         detections = np.expand_dims(detections, axis=0)
     if detections.shape[0] == 0: 
@@ -192,8 +192,8 @@ if __name__ == '__main__':
     
     files_dets = sort_detections_by_landmark_proximity(files_dets)
     
-    
-    for i, (detections, file) in enumerate(files_dets):
+    i=0
+    for (detections, file) in files_dets:
         orig = cv2.imread(file)
         h, w = orig.shape[:2]
         scale = 640 / max(h, w)
@@ -208,11 +208,20 @@ if __name__ == '__main__':
             cv2.BORDER_CONSTANT, value=[0,0,0]
         )
 
+        det = detections[0]
+        ymin, xmin, ymax, xmax = det[:4]
+        face_w, face_h = xmax - xmin, ymax - ymin
+        if face_w < 40 or face_h < 40:
+            print(f"Skipping {file} - face too small ({face_w:.0f}x{face_h:.0f})")
+            continue
+        
+
         save_detections(
             original_img=padded,
             detections=detections,
             output_path=f"{i:04d}.jpg"
         )
+        i+=1
 
 
 
