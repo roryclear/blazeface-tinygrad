@@ -156,39 +156,43 @@ def sort_detections_by_landmark_proximity(files_dets):
 if __name__ == '__main__':
     model = BlazeFace()
     base_dir = "."  # or wherever your folders are
-
-    files = []
+    files_dets = []
     for folder in os.listdir(base_dir):
+        files = []
         if folder.startswith("objects_") and os.path.isdir(os.path.join(base_dir, folder)):
             folder_path = os.path.join(base_dir, folder)
             for file in os.listdir(folder_path):
                 if file.lower().endswith((".jpg", ".jpeg", ".png")):
                     files.append(os.path.join(folder, file))
 
-    files_dets = []
+        seen_ids = set()
+        for file in files:
+            print(file, file.split("_")[2])
+            if file.split("_")[1] in seen_ids:
+                print("skipping dup object id")
+                continue
+            orig = cv2.imread(file)
 
-    for file in files:
-        print(file)
-        orig = cv2.imread(file)
+            h, w = orig.shape[:2]
+            scale = 640 / max(h, w)
+            resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
 
-        h, w = orig.shape[:2]
-        scale = 640 / max(h, w)
-        resized = cv2.resize(orig, (int(w*scale), int(h*scale)))
+            delta_w, delta_h = 640 - resized.shape[1], 640 - resized.shape[0]
+            top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+            left, right = delta_w // 2, delta_w - (delta_w // 2)
 
-        delta_w, delta_h = 640 - resized.shape[1], 640 - resized.shape[0]
-        top, bottom = delta_h // 2, delta_h - (delta_h // 2)
-        left, right = delta_w // 2, delta_w - (delta_w // 2)
+            padded = cv2.copyMakeBorder(
+                resized, top, bottom, left, right,
+                cv2.BORDER_CONSTANT, value=[0,0,0]
+            )
 
-        padded = cv2.copyMakeBorder(
-            resized, top, bottom, left, right,
-            cv2.BORDER_CONSTANT, value=[0,0,0]
-        )
+            img = Tensor(padded)
+            detections = jit_call(model, img).numpy()
+            detections = detections[detections[:, 4] != 0]
 
-        img = Tensor(padded)
-        detections = jit_call(model, img).numpy()
-        detections = detections[detections[:, 4] != 0]
-
-        if len(detections) > 0: files_dets.append([detections, file])
+            if len(detections) > 0:
+                seen_ids.add(file.split("_")[1])
+                files_dets.append([detections, file])
     
     files_dets = sort_detections_by_landmark_proximity(files_dets)
     
